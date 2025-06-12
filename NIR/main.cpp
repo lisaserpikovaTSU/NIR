@@ -237,7 +237,6 @@ void CNF::addClause(std::string from, std::string to, int fields_num) {
     } else {
         
     }
-    //
     //нужно определить в какой скобке уже есть исходящая связь, если она есть
 }
 
