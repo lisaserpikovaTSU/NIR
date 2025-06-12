@@ -1,0 +1,229 @@
+[
+  {
+    "fields_num": 1
+  },
+  {
+    "id": 14,
+    "name": "head",
+    "value": "NULL"
+  },
+  {
+    "id": 17,
+    "name": "newNode",
+    "value": "allocated_memory"
+  },
+  {
+    "id": 19,
+    "name": "newNode",
+    "f": "next",
+    "value": "NULL"
+
+  },
+  {
+    "id": 20,
+    "name": "head",
+    "valueO": "NULL",
+    "valueN": "newNode"
+  },
+  {
+    "id": 23,
+    "name": "newNode",
+    "valueO": "allocated_memory",
+    "valueN": "allocated_memory"
+  },
+  {
+    "id": 25,
+    "name": "newNode",
+    "f": "next",
+    "value": "head"
+  },
+  {
+    "id": 26,
+    "name": "head",
+    "valueO": "newNode",
+    "valueN": "newNode"
+  },
+  {
+    "id": 31,
+    "name": "newNode",
+    "valueO": "allocated_memory",
+    "valueN": "allocated_memory"
+  },
+  {
+    "id": 33,
+    "name": "newNode",
+    "f": "next",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 34,
+    "name": "head",
+    "f": "next",
+    "value": "newNode"
+  },
+  {
+    "id": 39,
+    "name": "temp",
+    "value": "head"
+  },
+  {
+    "id": 40,
+    "name": "head",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 41,
+    "name": "temp",
+    "op": "free"
+  },
+  {
+    "id": 46,
+    "name": "newNode",
+    "valueO": "allocated_memory",
+    "valueN": "allocated_memory"
+  },
+  {
+    "id": 48,
+    "name": "newNode",
+    "f": "next",
+    "value": "NULL"
+  },
+  {
+    "id": 50,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 51,
+    "op": "while",
+    "exp": {
+      "name": "current",
+      "f": "next",
+      "value": "NULL"
+    },
+    "do": {
+      "id": 52,
+      "name": "current",
+      "value": {
+        "name": "current",
+        "f": "next"
+      }
+    }
+  },
+  {
+    "id": 54,
+    "name": "current",
+    "f": "next",
+    "value": "newNode"
+  },
+  {
+    "id": 59,
+    "op": "if",
+    "exp": [
+      {
+        "name": "head",
+        "value": "NULL"
+      },
+      {
+        "name": "head",
+        "f": "next",
+        "value": "NULL"
+      }
+    ],
+    "do": [
+      {
+        "id": 60,
+        "name": "first",
+        "value": "head"
+      },
+      {
+        "id": 61,
+        "name": "second",
+        "value": {
+          "name": "head",
+          "f": "next"
+        }
+      },
+      {
+        "id": 63,
+        "name": "first",
+        "f": "next",
+        "value": {
+          "name": "second",
+          "f": "next"
+        }
+      },
+      {
+        "id": 64,
+        "name": "second",
+        "f": "next",
+        "value": "first"
+      },
+      {
+        "id": 65,
+        "name": "head",
+        "value": "second"
+      }
+    ]
+  },
+  {
+    "id": 72,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 73,
+    "op": "while",
+    "exp": {
+      "name": "current",
+      "valueN": "NULL"
+    },
+    "do": {
+      "id": 75,
+      "name": "current",
+      "value": {
+        "name": "current",
+        "f": "next"
+      }
+    }
+  },
+  {
+    "id": 80,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 81,
+    "op": "while",
+    "exp": {
+      "name": "current",
+      "value": "NULL"
+    },
+    "do": [
+      {
+        "id": 82,
+        "name": "temp",
+        "value": "current"
+      },
+      {
+        "id": 83,
+        "name": "current",
+        "value": {
+          "name": "current",
+          "f": "next"
+        }
+      },
+      {
+        "id": 84,
+        "name": "temp",
+        "op": "free"
+      }
+    ]
+  }
+]
