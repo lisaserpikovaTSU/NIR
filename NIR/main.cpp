@@ -76,12 +76,12 @@ BoolVector::~BoolVector(){
 }
 
 void BoolVector::Set1(int index){
-    if (index > nbit) resizeA(m+1);
+    if (index >= nbit) resizeA(nbit+1);
     v[index/8] |= (1 << (index%8));
 }
 
 void BoolVector::Set0(int index){
-    if (index > nbit) resizeA(m+1);
+    if (index >= nbit) resizeA(m+1);
     v[index/8] &= ~(1 << (index%8));
 }
 
@@ -164,7 +164,7 @@ BoolVector BoolVector::operator~() const{
 }
 
 std::ostream& operator << (std::ostream &os, const BoolVector &vec) {
-    for(int j=0;j<vec.nbit;j++){
+    for(int j=0;j<vec.m*8;j++){
         os << vec[j];
     }
     return os;
@@ -193,7 +193,7 @@ public:
     CNF();
     ~CNF();
     
-    void addClause(std::string, std::string, int);
+    void addClause(int, std::string, std::string);
     void setPos(int, int);
     void setNeg(int, int);
     void unsetPos(int, int);
@@ -207,36 +207,81 @@ public:
         return nVar;
     }
     
+    void printCNF();
+    void printVarNames();
+    
+    int findVarIndex(const std::string& name) const {
+            for (int i = 0; i < var_names.size(); i++) {
+                if (var_names[i] == name) {
+                    return i;
+                }
+            }
+            return -1; // не найдено
+        }
+    
 };
 
 CNF::CNF() {
     nVar = 0;
     nClaus = 0;
-    pos = nullptr;
-    neg = nullptr;
+    pos = new BoolVector[1]();
+    neg = new BoolVector[1]();
+    var_names.push_back("nullptr");
 }
 CNF::~CNF () {
     delete[] pos;
     delete[] neg;
 }
 
-void CNF::addClause(std::string from, std::string to, int fields_num) {
-    bool found = std::any_of(var_names.begin(), var_names.end(), [to](std::string const& s) {return s==to;}); //проверяем, есть ли имя переменной в кнф
-    if (!found){
-        var_names.push_back(to);
-        var_names.push_back(to+"_f");
-        nVar++;
-        resizeB(nClaus + 1);
-        
-        for (int i = 0; i < nClaus; i++) {
-            pos[i].resizeA(nVar);
-            neg[i].resizeA(nVar);
+void CNF::addClause(int fields_num, std::string from, std::string to = "") {
+    //Всё, что ниже - только для односвязного списка
+    int fromIndex = findVarIndex(from);
+    
+    if (to == "") {
+        if (fromIndex == -1) {
+            //создание элемента списка и проведение связи м-ду эл-том и переменной-указателем
+            var_names.push_back(from);
+            var_names.push_back(from+"_f");
+            nVar += 2;
+            resizeB(nClaus + 2);
+            setPos(nVar - 1, nVar);
+            setNeg(nVar, nVar - 1);
+        } else {
+            //перевыделение памяти для уже существующей переменной-указателя
+            int idx = -1;
+            for (int i = 0; i < nVar; i++) {
+                if (pos[fromIndex][i] == 1) {
+                    idx = i;
+                    break;
+                }
+            }
+            neg[idx].Set0(fromIndex);
+            BoolVector allZeros(nVar);
+            pos[fromIndex] = pos[fromIndex] & allZeros;
+            
         }
-        setPos(nClaus - 1, nVar - 1);
-        std::cout<<"2: "<<nClaus<<" "<<nVar<<std::endl;
-    } else {
         
+    } else {
+        int toIndex = findVarIndex(to);
+         
+        if (fromIndex == -1) {
+            //исправить
+            /*
+            var_names.push_back(from);
+            var_names.push_back(from+"_f");
+            nVar += 2;
+            resizeB(nClaus + 2);
+            if (toIndex == -1) {
+                
+            } else {
+                
+            }
+            */
+        } else {
+            
+        }
     }
+    //to improve
     //нужно определить в какой скобке уже есть исходящая связь, если она есть
 }
 
@@ -263,8 +308,8 @@ void CNF::unsetNeg(int iC, int iV) {
 }
 
 void CNF::resizeB(int new_nClaus) {
-    BoolVector* new_pos = new BoolVector[new_nClaus]();
-    BoolVector* new_neg = new BoolVector[new_nClaus]();
+    BoolVector* new_pos = new BoolVector[new_nClaus + 1]();
+    BoolVector* new_neg = new BoolVector[new_nClaus + 1]();
     
     if (pos != nullptr) {
         for (int i = 0; i < nClaus; i++) {
@@ -272,10 +317,12 @@ void CNF::resizeB(int new_nClaus) {
             new_neg[i] = neg[i];
         }
     }
-    
-    for (int i = nClaus; i < new_nClaus; i++) {
-        new_pos[i] = BoolVector(nVar);
-        new_neg[i] = BoolVector(nVar);
+    for (int i = 0; i < nClaus; i++) {
+        new_pos[i] = BoolVector(nVar+1) | pos[i];
+    }
+    for (int i = nClaus; i <= new_nClaus; i++) {
+        new_pos[i] = BoolVector(nVar+1);
+        new_neg[i] = BoolVector(nVar+1);
     }
     
     delete[] pos;
@@ -286,9 +333,22 @@ void CNF::resizeB(int new_nClaus) {
     nClaus = new_nClaus;
 }
 
+void CNF::printCNF() {
+    for (int i = 0; i<=nVar; i++) {
+        std::cout<< "pos["<<i<<"]"<<pos[i]<<"    "<<"neg["<<i<<"]"<<neg[i]<<std::endl;;
+    }
+}
+
+void CNF::printVarNames() {
+    std::cout << "var_names (" << var_names.size() << " элементов): ";
+            for (int i = 0; i < var_names.size(); i++) {
+                std::cout << "[" << i << "]:" << var_names[i] << " ";
+            }
+            std::cout << std::endl;
+}
+
 
 int main() {
-    
     
     std::ifstream data("/Users/liza/School/NIR/NIR/primer.json");
     if (!data.is_open()) {
@@ -299,13 +359,43 @@ int main() {
     json parsedJSON = json::parse(data);
     //std::cout << parsedJSON.dump(2) << std::endl;
     
-    int fields_num = parsedJSON[0]["fields_num"];
+    int fields_num = (int)parsedJSON[0]["fields_num"];
+    CNF cnf;
+    /*
+     if (fields_num == 1) {
+        значит списк односвязный и мы обрабатываем односвязный список
+     } else {
+        обрабатываем двусвязный список
+     }
+     */
+    for (int i = 1; i < parsedJSON.size(); i++) {
+        if(parsedJSON[i].contains("value")){
+            if(!parsedJSON[i].contains("f")) {
+                std::string Val{parsedJSON[i]["value"]};
+                
+                if (Val == "allocated_memory") {
+                    //создание элемента списка и проведение связи м-ду эл-том и переменной-указателем
+                    cnf.addClause(fields_num, parsedJSON[i]["name"]);
+                } else {
+                    cnf.addClause(fields_num, parsedJSON[i]["name"], Val);
+                }
+                
+                
+            } else {
+                //отработка кейсов когда значение валью - поле перменной
+            }
+        }
+    }
+    
+    cnf.printCNF();
+    cnf.printVarNames();
+    
     
     //строку 14 пропускаем так как там ничего не происходит
     //на строке 17 небходимо занести переменную и выделенную на нее память в таблицу
-    CNF cnf;
-    std::cout<<"1: "<<cnf.get_nClause()<<" "<<cnf.get_nVar()<<std::endl;
-    cnf.addClause(parsedJSON[2]["name"], parsedJSON[2]["value"], fields_num);
+    //CNF cnf;
+    //std::cout<<"1: "<<cnf.get_nClause()<<" "<<cnf.get_nVar()<<std::endl;
+    //cnf.addClause(parsedJSON[2]["name"], parsedJSON[2]["value"], fields_num);
     
     /*
     std::string name{parsedJSON[0]["name"]};
@@ -320,7 +410,6 @@ int main() {
     
     //CNF jsonchik;
     
-    std::cout << "Hello, World!\n";
     data.close();
     
     return 0;

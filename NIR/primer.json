@@ -3,11 +3,6 @@
     "fields_num": 1
   },
   {
-    "id": 14,
-    "name": "head",
-    "value": "NULL"
-  },
-  {
     "id": 17,
     "name": "newNode",
     "value": "allocated_memory"
@@ -22,8 +17,7 @@
   {
     "id": 20,
     "name": "head",
-    "valueO": "NULL",
-    "valueN": "newNode"
+    "value": "newNode"
   },
   {
     "id": 23,
