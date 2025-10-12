@@ -288,9 +288,44 @@ void CNF::addClause(int fields_num, std::string from, std::string to = "") {
         } else {
             //переопределение связи
             if (toIndex == -1) {
-                
+                //Может ли такое быть?
+                /*  struct Node* head = NULL;
+                    struct Node* newNode = malloc;
+                    newNode = head;
+                 */
+                int idx = -1;
+                for (int i = 0; i < nVar; i++) {
+                    if (pos[fromIndex][i] == 1) {
+                        idx = i;
+                        break;
+                    }
+                }
+                neg[idx].Set0(fromIndex);
+                BoolVector allZeros(nVar);
+                pos[fromIndex] = pos[fromIndex] & allZeros;
             } else {
-                
+                /*  struct Node* head = malloc;
+                    struct Node* newNode = malloc;
+                    head = newNode;
+                 */
+                int idx = -1;
+                for (int i = 0; i < nVar; i++) {
+                    if (pos[fromIndex][i] == 1) {
+                        idx = i;
+                        break;
+                    }
+                }
+                neg[idx].Set0(fromIndex);
+                BoolVector allZeros(nVar);
+                pos[fromIndex] = pos[fromIndex] & allZeros;
+                for (int i = 0; i < nVar; i++) {
+                    if (pos[toIndex][i] == 1) {
+                        idx = i;
+                        break;
+                    }
+                }
+                pos[fromIndex].Set1(idx);
+                neg[idx].Set1(fromIndex);
             }
         }
     }
