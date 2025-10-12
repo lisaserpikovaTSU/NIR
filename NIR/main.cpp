@@ -260,29 +260,40 @@ void CNF::addClause(int fields_num, std::string from, std::string to = "") {
             pos[fromIndex] = pos[fromIndex] & allZeros;
             
         }
-        
     } else {
         int toIndex = findVarIndex(to);
          
         if (fromIndex == -1) {
-            //исправить
-            /*
             var_names.push_back(from);
-            var_names.push_back(from+"_f");
-            nVar += 2;
-            resizeB(nClaus + 2);
+            nVar += 1;
+            resizeB(nClaus + 1);
+            if (toIndex == -1) {
+                //обработка случая, когда
+                /*  struct Node* head = NULL;
+                    struct Node* newNode = head;
+                    или
+                    struct Node* head;
+                    struct Node* newNode = head;
+                */
+                //ДОПИСАТЬ, 
+            } else {
+                //обработка случая, когда
+                /*  struct Node* head = NULL;
+                    struct Node* newNode = malloc;
+                    head = newNode;
+                */
+                pos[nVar] = pos[fromIndex];
+                neg[toIndex].Set1(nVar);
+            }
+        } else {
+            //переопределение связи
             if (toIndex == -1) {
                 
             } else {
                 
             }
-            */
-        } else {
-            
         }
     }
-    //to improve
-    //нужно определить в какой скобке уже есть исходящая связь, если она есть
 }
 
 void CNF::setPos(int iC, int iV) {
@@ -363,7 +374,7 @@ int main() {
     CNF cnf;
     /*
      if (fields_num == 1) {
-        значит списк односвязный и мы обрабатываем односвязный список
+        значит список односвязный и мы обрабатываем односвязный список
      } else {
         обрабатываем двусвязный список
      }
@@ -377,6 +388,7 @@ int main() {
                     //создание элемента списка и проведение связи м-ду эл-том и переменной-указателем
                     cnf.addClause(fields_num, parsedJSON[i]["name"]);
                 } else {
+                    //перепроведение связи
                     cnf.addClause(fields_num, parsedJSON[i]["name"], Val);
                 }
                 
