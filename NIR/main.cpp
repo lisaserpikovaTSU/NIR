@@ -180,13 +180,14 @@ std::istream& operator >> (std::istream &is, BoolVector &vec) {
 
 class CNF {
 private:
-    BoolVector *pos;
+    BoolVector *pos_type1;
+    BoolVector *pos_type2;
     BoolVector *neg;
     std::vector<std::string> var_names;
     
     int nVar;
     int nClaus;
-    
+     
     void resizeB(int);
 
 public:
@@ -194,12 +195,13 @@ public:
     ~CNF();
     
     void addClause(int, std::string, std::string);
-    void setPos(int, int);
+    void setPos1(int, int);
+    void setPos2(int, int);
     void setNeg(int, int);
-    void unsetPos(int, int);
+    void unsetPos1(int, int);
+    void unsetPos2(int, int);
     void unsetNeg(int, int);
     
-    //ПОТОМ УДАЛИТЬ!!!!!!!!!
     int get_nClause(){
         return nClaus;
     }
@@ -211,25 +213,27 @@ public:
     void printVarNames();
     
     int findVarIndex(const std::string& name) const {
-            for (int i = 0; i < var_names.size(); i++) {
-                if (var_names[i] == name) {
-                    return i;
-                }
+        for (int i = 0; i < var_names.size(); i++) {
+            if (var_names[i] == name) {
+                return i;
             }
-            return -1; // не найдено
         }
+        return -1;
+    }
     
 };
 
 CNF::CNF() {
     nVar = 0;
     nClaus = 0;
-    pos = new BoolVector[1]();
+    pos_type1 = new BoolVector[1]();
+    pos_type2 = new BoolVector[1]();
     neg = new BoolVector[1]();
     var_names.push_back("nullptr");
 }
 CNF::~CNF () {
-    delete[] pos;
+    delete[] pos_type1;
+    delete[] pos_type2;
     delete[] neg;
 }
 
@@ -330,10 +334,15 @@ void CNF::addClause(int fields_num, std::string from, std::string to = "") {
         }
     }
 }
-
-void CNF::setPos(int iC, int iV) {
+*/
+void CNF::setPos1(int iC, int iV) {
     if (iC < nClaus) {
-        pos[iC].Set1(iV);
+        pos_type1[iC].Set1(iV);
+    }
+}
+void CNF::setPos2(int iC, int iV) {
+    if (iC < nClaus) {
+        pos_type2[iC].Set1(iV);
     }
 }
 void CNF::setNeg(int iC, int iV) {
@@ -341,12 +350,16 @@ void CNF::setNeg(int iC, int iV) {
         neg[iC].Set1(iV);
     }
 }
-void CNF::unsetPos(int iC, int iV) {
+void CNF::unsetPos1(int iC, int iV) {
     if (iC < nClaus) {
-        pos[iC].Set0(iV);
+        pos_type1[iC].Set0(iV);
     }
 }
-
+void CNF::unsetPos2(int iC, int iV) {
+    if (iC < nClaus) {
+        pos_type2[iC].Set0(iV);
+    }
+}
 void CNF::unsetNeg(int iC, int iV) {
     if (iC < nClaus) {
         neg[iC].Set0(iV);
@@ -354,34 +367,41 @@ void CNF::unsetNeg(int iC, int iV) {
 }
 
 void CNF::resizeB(int new_nClaus) {
-    BoolVector* new_pos = new BoolVector[new_nClaus + 1]();
+    BoolVector* new_pos1 = new BoolVector[new_nClaus + 1]();
+    BoolVector* new_pos2 = new BoolVector[new_nClaus + 1]();
     BoolVector* new_neg = new BoolVector[new_nClaus + 1]();
     
-    if (pos != nullptr) {
+    if (pos_type1 != nullptr) {
         for (int i = 0; i < nClaus; i++) {
-            new_pos[i] = pos[i];
+            new_pos1[i] = pos_type1[i];
+            new_pos2[i] = pos_type2[i];
             new_neg[i] = neg[i];
         }
     }
     for (int i = 0; i < nClaus; i++) {
-        new_pos[i] = BoolVector(nVar+1) | pos[i];
+        new_pos1[i] = BoolVector(nVar+1) | pos_type1[i];
+        new_pos2[i] = BoolVector(nVar+1) | pos_type2[i];
+        new_neg[i] = BoolVector(nVar+1) | neg[i];
     }
     for (int i = nClaus; i <= new_nClaus; i++) {
-        new_pos[i] = BoolVector(nVar+1);
+        new_pos1[i] = BoolVector(nVar+1);
+        new_pos2[i] = BoolVector(nVar+1);
         new_neg[i] = BoolVector(nVar+1);
     }
     
-    delete[] pos;
+    delete[] pos_type1;
+    delete[] pos_type2;
     delete[] neg;
         
-    pos = new_pos;
+    pos_type1 = new_pos1;
+    pos_type2 = new_pos2;
     neg = new_neg;
     nClaus = new_nClaus;
 }
 
 void CNF::printCNF() {
     for (int i = 0; i<=nVar; i++) {
-        std::cout<< "pos["<<i<<"]"<<pos[i]<<"    "<<"neg["<<i<<"]"<<neg[i]<<std::endl;;
+        std::cout<< "pos1["<<i<<"]"<<pos_type1[i]<< "pos2["<<i<<"]"<<pos_type2[i]<<"    "<<"neg["<<i<<"]"<<neg[i]<<std::endl;;
     }
 }
 
