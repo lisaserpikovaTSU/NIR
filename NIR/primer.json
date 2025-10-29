@@ -1,18 +1,24 @@
 [
   {
-    "fields_num": 1
+    "fields_num": 2,
+    "fields": ["next", "prev"]
   },
   {
-    "id": 17,
+    "id": 16,
     "name": "newNode",
-    "value": "allocated_memory"
+    "value": "N1"
+  },
+  {
+    "id": 18,
+    "name": "newNode",
+    "f": "next",
+    "value": "NULL"
   },
   {
     "id": 19,
     "name": "newNode",
-    "f": "next",
+    "f": "prev",
     "value": "NULL"
-
   },
   {
     "id": 20,
@@ -22,8 +28,7 @@
   {
     "id": 23,
     "name": "newNode",
-    "valueO": "allocated_memory",
-    "valueN": "allocated_memory"
+    "value": "N2"
   },
   {
     "id": 25,
@@ -33,15 +38,25 @@
   },
   {
     "id": 26,
+    "name": "newNode",
+    "f": "prev",
+    "value": "NULL"
+  },
+  {
+    "id": 27,
     "name": "head",
-    "valueO": "newNode",
-    "valueN": "newNode"
+    "f": "prev",
+    "value": "newNode"
+  },
+  {
+    "id": 28,
+    "name": "head",
+    "value": "newNode"
   },
   {
     "id": 31,
     "name": "newNode",
-    "valueO": "allocated_memory",
-    "valueN": "allocated_memory"
+    "value": "N3"
   },
   {
     "id": 33,
@@ -54,17 +69,37 @@
   },
   {
     "id": 34,
+    "name": "newNode",
+    "f": "prev",
+    "value": "head"
+  },
+  {
+    "id": 35,
+    "name": "current",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 36,
+    "name": "current",
+    "f": "prev",
+    "value": "newNode"
+  },
+  {
+    "id": 37,
     "name": "head",
     "f": "next",
     "value": "newNode"
   },
   {
-    "id": 39,
-    "name": "temp",
+    "id": 40,
+    "name": "current",
     "value": "head"
   },
   {
-    "id": 40,
+    "id": 41,
     "name": "head",
     "value": {
       "name": "head",
@@ -72,15 +107,20 @@
     }
   },
   {
-    "id": 41,
-    "name": "temp",
+    "id": 42,
+    "name": "head",
+    "f": "prev",
+    "value": "NULL"
+  },
+  {
+    "id": 43,
+    "name": "current",
     "op": "free"
   },
   {
     "id": 46,
     "name": "newNode",
-    "valueO": "allocated_memory",
-    "valueN": "allocated_memory"
+    "value": "N4"
   },
   {
     "id": 48,
@@ -95,129 +135,150 @@
   },
   {
     "id": 51,
-    "op": "while",
-    "exp": {
+    "name": "current",
+    "value": {
       "name": "current",
-      "f": "next",
-      "value": "NULL"
-    },
-    "do": {
-      "id": 52,
-      "name": "current",
-      "value": {
-        "name": "current",
-        "f": "next"
-      }
+      "f": "next"
     }
   },
   {
-    "id": 54,
+    "id": 52,
+    "name": "current",
+    "value": {
+      "name": "current",
+      "f": "next"
+    }
+  },
+  {
+    "id": 53,
     "name": "current",
     "f": "next",
     "value": "newNode"
   },
   {
-    "id": 59,
-    "op": "if",
-    "exp": [
-      {
-        "name": "head",
-        "value": "NULL"
-      },
-      {
-        "name": "head",
-        "f": "next",
-        "value": "NULL"
-      }
-    ],
-    "do": [
-      {
-        "id": 60,
-        "name": "first",
-        "value": "head"
-      },
-      {
-        "id": 61,
-        "name": "second",
-        "value": {
-          "name": "head",
-          "f": "next"
-        }
-      },
-      {
-        "id": 63,
-        "name": "first",
-        "f": "next",
-        "value": {
-          "name": "second",
-          "f": "next"
-        }
-      },
-      {
-        "id": 64,
-        "name": "second",
-        "f": "next",
-        "value": "first"
-      },
-      {
-        "id": 65,
-        "name": "head",
-        "value": "second"
-      }
-    ]
+    "id": 57,
+    "name": "first",
+    "value": "head"
   },
   {
-    "id": 72,
+    "id": 58,
+    "name": "second",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 59,
+    "name": "first",
+    "f": "next",
+    "value": {
+      "name": "second",
+      "f": "next"
+    }
+  },
+  {
+    "id": 60,
+    "name": "second",
+    "f": "next",
+    "value": "first"
+  },
+  {
+    "id": 61,
+    "name": "second",
+    "f": "prev",
+    "value": "NULL"
+  },
+  {
+    "id": 62,
+    "name": "first",
+    "f": "prev",
+    "value": "second"
+  },
+  {
+    "id": 63,
+    "name": "current",
+    "value": {
+      "name": "first",
+      "f": "next"
+    }
+  },
+  {
+    "id": 64,
+    "name": "current",
+    "f": "prevt",
+    "value": "first"
+  },
+  {
+    "id": 65,
+    "name": "head",
+    "value": "second"
+  },
+  {
+    "id": 69,
     "name": "current",
     "value": "head"
   },
   {
+    "id": 71,
+    "name": "current",
+    "value": {
+      "name": "current",
+      "f": "next"
+    }
+  },
+  {
     "id": 73,
-    "op": "while",
-    "exp": {
+    "name": "current",
+    "value": {
       "name": "current",
-      "valueN": "NULL"
-    },
-    "do": {
-      "id": 75,
-      "name": "current",
-      "value": {
-        "name": "current",
-        "f": "next"
-      }
+      "f": "next"
+    }
+  },
+  {
+    "id": 78,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 79,
+    "name": "head",
+    "value": {
+      "name": "head",
+      "f": "next"
     }
   },
   {
     "id": 80,
     "name": "current",
+    "op": "free"
+  },
+  {
+    "id": 82,
+    "name": "current",
     "value": "head"
   },
   {
-    "id": 81,
-    "op": "while",
-    "exp": {
-      "name": "current",
-      "value": "NULL"
-    },
-    "do": [
-      {
-        "id": 82,
-        "name": "temp",
-        "value": "current"
-      },
-      {
-        "id": 83,
-        "name": "current",
-        "value": {
-          "name": "current",
-          "f": "next"
-        }
-      },
-      {
-        "id": 84,
-        "name": "temp",
-        "op": "free"
-      }
-    ]
+    "id": 83,
+    "name": "head",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 84,
+    "name": "current",
+    "op": "free"
+  },
+  {
+    "id": 86,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 87,
+    "name": "current",
+    "op": "free"
   }
 ]
