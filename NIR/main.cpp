@@ -266,7 +266,8 @@ public:
     void addAlMem(std::string, int, int);
     void addPtrVar(std::string, int);
     void addNULL(int, int);
-    void point(int, std::string);
+    void point(int&, std::string, int&);
+    void rePoint(int&, int&, int&);
     bool isDangling(int&, int);
     bool pointsAtNULL(int&, int);
     bool isEmpty();
@@ -441,7 +442,7 @@ int CNF::findFieldIndType2(int indOut) const {
     //Функция для поиска предыдущего узла на который ссылается узел indOut
     int ind = -1;
     for (int i = 0; i <= nVar; i++) {
-        if(pos_type2[i] == 1) ind = i;
+        if(pos_type2[indOut][i] == 1) ind = i;
     }
     return ind;
 }
@@ -460,8 +461,8 @@ void CNF::deleteNode(std::string& name) {
             ptr_var.Set0(i);
         }
     }
-    
     ptr_var.Set0(nVar);
+    
     //"Вырезаем" удаляемый узел из столбцов
     for (int i = 0; i <= nVar; i++) {
         for (int j = ind; j < nVar; j++) {
@@ -496,7 +497,6 @@ void CNF::deleteNode(std::string& name) {
 }
 
 void CNF::freeNode(int& ind, std::vector<CNF>& danglingPointers, int nFields = 1, int fieldType = 1) {
-    std::string freeName = var_names[ind];
     int indToFree;
     if (fieldType == 1) {
         indToFree = pos_type1[ind].getLink();
@@ -516,9 +516,7 @@ void CNF::freeNode(int& ind, std::vector<CNF>& danglingPointers, int nFields = 1
     for (std::string name: namesToDel) {
         deleteNode(name);
     }
-    
-    
-    deleteNode(freeName);
+    deleteNode(var_names[indToFree]);
 }
 
 
@@ -602,10 +600,16 @@ CNF CNF::divide(int nFields) {
         }
     }
     std::vector<std::unordered_set<int>> listsUnique = findUnique(lists);
-    if (listsUnique.size() == 1 || listsUnique.size() == 0) {
+    //if (listsUnique.size() == 1 || listsUnique.size() == 0) {
+    if( listsUnique.size() == 0) {
+        std::cout<<"ПОЧЕМУ НЕТ ПЕРЕМЕННЫХ????"<<std::endl;
+        return cnf;
+    }
+    if (listsUnique.size() == 1) {
         checkFictiousBonds(listsUnique[0], nFields);
         return cnf;
     }
+    checkFictiousBonds(listsUnique[0], nFields);
     int shortInd = 0;
     for (int i = 1; i < listsUnique.size(); i++) {
         if (listsUnique[i].size() < listsUnique[shortInd].size()) {
@@ -710,13 +714,29 @@ void CNF::addNULL(int indOut, int type = 1) {
     neg[0].Set1(indOut);
 }
 
-void CNF::point(int ind, std::string nameOut) {
+void CNF::point(int& ind, std::string nameOut, int& type) {
     var_names.push_back(nameOut);
     resizeB(nVar+1);
-    pos_type1[nVar] = pos_type1[ind];
-    pos_type2[nVar] = pos_type2[ind];
-    neg[nVar] = neg[ind];
+    if (type == 1) {
+        pos_type1[nVar] = pos_type1[ind];
+        neg[pos_type1[nVar].getLink()].Set1(nVar);
+    } else {
+        pos_type2[nVar] = pos_type2[ind];
+        neg[pos_type2[nVar].getLink()].Set1(nVar);
+    }
     ptr_var.Set1(nVar);
+}
+
+void CNF::rePoint(int& ind, int& out, int& type) {
+    if (type == 1) {
+        neg[pos_type1[out].getLink()].Set0(out);
+        pos_type1[out] = pos_type1[ind];
+        neg[pos_type1[out].getLink()].Set1(out);
+    } else {
+        neg[pos_type2[out].getLink()].Set0(out);
+        pos_type2[out] = pos_type2[ind];
+        neg[pos_type2[out].getLink()].Set1(out);
+    }
 }
 
 bool CNF::isDangling(int& ind, int type=1) {
@@ -765,7 +785,7 @@ void CNF::merge(CNF& right, int& from, int& to, int fieldType = 1) {
     }
     int size = (int)list.size();
     resizeB(nVar+size);
-    std::vector<int> oldToNew(nVar, -1);
+    std::vector<int> oldToNew(right.nVar+1, -1);
     std::unordered_set<int> newInds;
     
     int newInd = nVar - size + 1;
@@ -776,7 +796,7 @@ void CNF::merge(CNF& right, int& from, int& to, int fieldType = 1) {
         oldToNew[oldInd] = newInd;
         std::string name = right.var_names[oldInd];
         var_names.push_back(name);
-        if (right.ptr_var[oldInd] == 1) ptr_var.Set0(newInd);
+        if (right.ptr_var[oldInd] == 1) ptr_var.Set1(newInd);
         newInds.insert(newInd);
         newInd++;
         
@@ -801,7 +821,6 @@ void CNF::merge(CNF& right, int& from, int& to, int fieldType = 1) {
             pos_type1[newFrom].Set1(0);
             neg[0].Set1(newFrom);
         }
-        //?????????
         if (right.pos_type2[oldFrom][0] == 1){
             pos_type2[newFrom].Set1(0);
             neg[0].Set1(newFrom);
@@ -816,10 +835,13 @@ void CNF::merge(CNF& right, int& from, int& to, int fieldType = 1) {
     int newTo = oldToNew[to];
     
     if (fieldType == 1) {
-        pos_type1[from].Set1(newTo);
+        pos_type1[from] = pos_type1[newTo];
+        neg[pos_type1[from].getLink()].Set1(from);
     } else {
-        pos_type2[from].Set1(newTo);
+        pos_type2[from] = pos_type1[newTo];
+        neg[pos_type2[from].getLink()].Set1(from);
     }
+    
     
 }
 
@@ -833,14 +855,17 @@ std::pair<int, int> find(std::vector<CNF>& CNFcontainer, std::string name){
     return {-1, -1};
 }
 
-void makeCNF2(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::vector<std::string>& fields) {
+void makeCNF(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::vector<std::string>& fields) {
     int nFields = (int)fields.size();
     for (int i = 1; i < parsedJSON.size(); i++) {
+        if (i == 4) {
+            std::cout<<"Hi"<<std::endl;
+        }
         std::pair<int, int> varInd = find(CNFcontainer, parsedJSON[i]["name"]);
         int type = 1;
         std::string name = parsedJSON[i]["name"];
         if (parsedJSON[i].contains("f")) {
-            if (parsedJSON[i]["f"] == fields[1]){
+            if (nFields == 2 && parsedJSON[i]["f"] == fields[1]){
                 type = 2;
                 varInd.second = CNFcontainer[varInd.first].findFieldIndType2(varInd.second);
             } else {
@@ -850,7 +875,7 @@ void makeCNF2(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std:
         }
         
         std::string value;
-        if (!parsedJSON[i]["value"].is_structured()) {
+        if (parsedJSON[i].contains("value") && !parsedJSON[i]["value"].is_structured()) {
             value = parsedJSON[i]["value"];
         }
         /*
@@ -859,14 +884,15 @@ void makeCNF2(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std:
         }
          */
         
-        if (parsedJSON[i].contains("op")) {
+        if (parsedJSON[i].contains("op") && CNFcontainer[varInd.first].get_nVar() > 1) {
             std::vector<CNF> danglingPointers;
-            CNFcontainer[varInd.first].freeNode(varInd.second, danglingPointers, 2, type);
+            CNFcontainer[varInd.first].freeNode(varInd.second, danglingPointers, nFields, type);
             for (int i = 0; i < danglingPointers.size(); i++) {
                 CNFcontainer.push_back(danglingPointers[i]);
             }
             CNF nCnf = CNFcontainer[varInd.first].divide(nFields);
             if (nCnf.get_nVar() > 0) CNFcontainer.push_back(nCnf);
+            
         } else if (!parsedJSON[i].contains("value")) {
             CNF nCnf;
             nCnf.addPtrVar(parsedJSON[i]["name"], nFields);
@@ -882,11 +908,8 @@ void makeCNF2(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std:
                 CNFcontainer.push_back(nCnf);
             } else {
                 CNFcontainer[varInd.first].addNULL(varInd.second, type);
-                std::cout<<"ТОЧкА"<<std::endl;
-                CNFcontainer[varInd.first].printCNF();
                 CNF nCnf = CNFcontainer[varInd.first].divide(nFields);
                 if (nCnf.get_nVar() > 0) CNFcontainer.push_back(nCnf);
-                CNFcontainer[CNFcontainer.size()-1].printCNF();
             }
         } else if (value[0] == 'N') {
             if (varInd.first == -1 && varInd.second == -1) {
@@ -905,7 +928,7 @@ void makeCNF2(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std:
             std::string name2;
             if (parsedJSON[i]["value"].is_structured()) {
                 varInd2 = find(CNFcontainer, parsedJSON[i]["value"]["name"]);
-                if (parsedJSON[i]["f"] == fields[1]){
+                if (nFields == 2 && parsedJSON[i]["value"]["f"] == fields[1]){
                     type2 = 2;
                     varInd2.second = CNFcontainer[varInd2.first].findFieldIndType2(varInd2.second);
                     name2 = CNFcontainer[varInd2.first].get_varName(varInd2.second);
@@ -962,24 +985,30 @@ void makeCNF2(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std:
                     //если левая часть тоже висячий указатель, то пропускаем
                 } else {
                     //если правая часть указывает на участок памяти
-                    if (varInd.first != -1) {
-                        //мб тут проблема
-                        CNFcontainer[varInd.first].deleteNode(name);
+                    if (varInd.first == varInd2.first){
+                        CNFcontainer[varInd2.first].rePoint(varInd2.second, varInd.second, type);
                     }
-                    CNFcontainer[varInd2.first].point(varInd2.second, parsedJSON[i]["name"]);
-                    CNF nCnf = CNFcontainer[varInd2.first].divide(nFields);
-                    if (CNFcontainer[varInd.first].get_nVar() == 0) {
-                        CNFcontainer.erase(CNFcontainer.begin() + varInd.first);
+                    CNFcontainer[varInd2.first].point(varInd2.second, name, type);
+                    if (varInd.first != -1) {
+                        CNFcontainer[varInd.first].deleteNode(name);
+                        CNF nCnf = CNFcontainer[varInd2.first].divide(nFields);
+                        if (CNFcontainer[varInd.first].get_nVar() == 0) {
+                            CNFcontainer.erase(CNFcontainer.begin() + varInd.first);
+                        }
+                    } else {
+                        CNF nCnf = CNFcontainer[varInd2.first].divide(nFields);
                     }
                 }
             } else {
-                //левая часть обращается к полю, правая без раницы
+                //левая часть обращается к полю, правая без разницы
                 if (CNFcontainer[varInd2.first].pointsAtNULL(varInd2.second, type)) {
                     CNFcontainer[varInd.first].addNULL(varInd.second, type);
                 } else if (CNFcontainer[varInd2.first].isDangling(varInd2.second, type)) {
                     CNFcontainer[varInd.first].makeDangling(varInd.second, type);
-                } else {
+                } else if (varInd.first != varInd2.first){
                     CNFcontainer[varInd.first].merge(CNFcontainer[varInd2.first], varInd.second, varInd2.second, type);
+                } else {
+                    CNFcontainer[varInd2.first].rePoint(varInd2.second, varInd.second, type);
                 }
                 CNF nCnf = CNFcontainer[varInd.first].divide(nFields);
                 if (nCnf.get_nVar() > 0) CNFcontainer.push_back(nCnf);
@@ -996,7 +1025,7 @@ void makeCNF2(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std:
 }
 
 int main() {
-    std::ifstream data("/Users/liza/School/NIR/NIR/primer.json");
+    std::ifstream data("/Users/diman4ik/Documents/NIR/NIR/primer.json");
     if (!data.is_open()) {
         std::cerr << "Ошибка открытия файла" << std::endl;
         return 1;
@@ -1013,11 +1042,12 @@ int main() {
         fields.push_back(parsedJSON[0]["fields"][0]);
         fields.push_back(parsedJSON[0]["fields"][1]);
     }
-    makeCNF2(parsedJSON, CNFcontainer, fields);
-                            
+    makeCNF(parsedJSON, CNFcontainer, fields);
+    /*
     for (int i = 0; i < CNFcontainer.size(); i++) {
         CNFcontainer[i].printCNF();
     }
+     */
                             
     data.close();
                             

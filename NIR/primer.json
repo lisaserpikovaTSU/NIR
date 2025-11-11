@@ -4,6 +4,11 @@
     "fields": ["next", "prev"]
   },
   {
+    "id": 14,
+    "name": "head",
+    "value": "NULL"
+  },
+  {
     "id": 16,
     "name": "newNode",
     "value": "N1"
