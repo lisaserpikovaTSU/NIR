@@ -147,14 +147,6 @@
     }
   },
   {
-    "id": 52,
-    "name": "current",
-    "value": {
-      "name": "current",
-      "f": "next"
-    }
-  },
-  {
     "id": 53,
     "name": "current",
     "f": "next",
