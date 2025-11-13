@@ -4,8 +4,131 @@
 #include <string>
 #include <iomanip>
 #include <unordered_set>
+#include <unordered_map>
+#include <vector>
+#include <stack>
+#include <algorithm>
 
 using json = nlohmann::json;
+
+//sat-решатель взят здесь
+//https ://github.com/QabasAK/2SAT-Solver/blob/main/2SAT/2SATSolver.cpp
+// defining CNFs
+using Clause = std::pair<int, int>;
+using Formula = std::vector<Clause>;
+
+class TwoSAT {
+private:
+    // implication graph with vertices = 2 * variables
+    std::unordered_map<int, std::vector<int>> graph;
+    int vars = 0;
+
+    // necessary data structures for SCC & DFS
+    int id = 0;
+    std::unordered_map<int, int> ids;
+    std::unordered_map<int, int> low;
+    std::unordered_map<int, bool> inStack;
+    std::stack<int> s;
+
+    // hypothesis -> conclusion
+    // a or b = -a -> b
+    //        = -b -> a
+    void buildImplicationGraph(const Formula& formula) {
+        // max literal
+        for (const auto& clause : formula) {
+            vars = std::max(vars, std::abs(clause.first));
+            vars = std::max(vars, std::abs(clause.second));
+        }
+
+        // creating vertices
+        for (int i = 1; i <= vars; i++) {
+            graph[i] = std::vector<int>();
+            graph[-i] = std::vector<int>();
+        }
+
+        // creating edges
+        for (const auto& clause : formula) {
+            int a = clause.first;
+            int b = clause.second;
+            graph[-a].push_back(b);
+            graph[-b].push_back(a);
+        }
+    }
+
+    // to find strongly connected components with Tarjan's Algorithm
+    void DFS(int source) {
+        s.push(source);
+        inStack[source] = true;
+        ids[source] = id;
+        low[source] = id;
+        id++;
+        
+        if (graph.find(source) != graph.end()) {
+            for (int v : graph[source]) {
+                // if unvisited, DFS
+                if (ids.find(v) == ids.end() || ids[v] == -1) {
+                    DFS(v);
+                }
+                // smallest ID reachable from source to identify
+                // root node in SCC
+                if (inStack[v]) {
+                    low[source] = std::min(low[source], low[v]);
+                }
+            }
+        }
+        
+        // remove from the stack to avoid revisiting
+        if (ids[source] == low[source]) {
+            while (!s.empty()) {
+                int node = s.top();
+                s.pop();
+                inStack[node] = false;
+                low[node] = ids[source];
+                if (node == source) {
+                    break;
+                }
+            }
+        }
+    }
+
+    // O(V + E)
+    void findSCC() {
+        for (int i = 1; i <= vars; i++) {
+            ids[i] = -1;
+            ids[-i] = -1;
+            inStack[i] = false;
+            inStack[-i] = false;
+        }
+
+        for (int i = 1; i <= vars; i++) {
+            if (ids[i] == -1) DFS(i);
+            if (ids[-i] == -1) DFS(-i);
+        }
+    }
+
+public:
+    bool solve(const Formula& formula) {
+        // Reset state for new formula
+        graph.clear();
+        ids.clear();
+        low.clear();
+        inStack.clear();
+        while (!s.empty()) s.pop();
+        id = 0;
+        vars = 0;
+
+        buildImplicationGraph(formula);
+        findSCC();
+        
+        // if a variable and its negation are in the same SCC : UNSAT
+        for (int i = 1; i <= vars; i++) {
+            if (low[i] == low[-i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
 
 class BoolVector {
 private:
@@ -238,10 +361,10 @@ std::istream& operator >> (std::istream &is, BoolVector &vec) {
 
 class CNF {
 private:
-    BoolVector ptr_var;     //1 для бита индекса для тех узлов, которые являются переменными-указателями
-    BoolVector *pos_type1;
-    BoolVector *pos_type2;
-    BoolVector *neg;
+    BoolVector ptr_var;       //1 на идексе бита тех объектов, которые являются переменными-указателями
+    BoolVector *pos_type1;    //связь типа next
+    BoolVector *pos_type2;    //связь типа prev
+    BoolVector *neg;          //Входящие связи
     std::vector<std::string> var_names;
     
     int nVar;
@@ -254,52 +377,61 @@ public:
     ~CNF();
     CNF& operator=(const CNF&);
     
-    int get_nVar(){
+    int get_nVar(){                         //геттер для количества объектов
         return nVar;
     }
-    
-    std::string get_varName(int& ind) {
+                                       
+    std::string get_varName(int& ind) {    //геттер для имен объектов
         return var_names[ind];
     }
     
     void printCNF();
     void printVarNames();
     
-    int findVarIndex(const std::string&) const;
-    int findFieldInd(int) const;
-    //int findFieldIndType2(int) const;
-    void deleteNode(std::string&);
-    void freeNode(int&, std::vector<CNF>&, int, int);
-    void bypass(int, int, std::unordered_set<int>&, std::unordered_set<int>&);
-    void checkFictiousBonds(std::unordered_set<int>&, int);
-    CNF divide(int);
-    void addAlMem(std::string, int, int);
-    void addPtrVar(std::string, int);
-    void addNULL(int, int);
-    void point(int&, std::string, int&);
-    void rePoint(int&, int&, int&, int&);
-    bool isDangling(int&, int);
-    bool pointsAtNULL(int&, int);
-    bool isEmpty();
-    void makeDangling(int&, int);
-    void merge(CNF&, int&, int&, int);
+    int findVarIndex(const std::string&) const;          //поиск индекса объета по имени
+    int findFieldInd(int) const;                         //поиск идекса узла, к которому обращается объект с
+                                                         //идексом ind
+    void deleteNode(std::string&);                               //Вырезает объект из таблицы
+    void freeNode(int&, std::vector<CNF>&, int, int);            //Переносит висячие указатели и удаляет объект
+                                                                 //методом deleteNode
+    void bypass(int, int, std::unordered_set<int>&, std::unordered_set<int>&);     //обход таблицы для отслеживания
+                                                                                   //отдельных кнф
+    void checkFictiousBonds(std::unordered_set<int>&, int);        //определени и переопределение фиктивнфх связей
+    
+    CNF divide(int);                                           //разделение кнф на несвязанные
+    
+    void addAlMem(std::string, int, int);                      //метод для добавления новых участков памяти
+    void addPtrVar(std::string, int);                          //добавление переменных-указателей
+    void addNULL(int, int);                                    //добавление ссылки на null
+    void point(int&, std::string, int&);                       //добавление связи
+    void rePoint(int&, int&, int&, int&);                      //перестроение связи
+    
+    bool isDangling(int&, int);                //проверка на то, что указатель обращается к
+                                                // мусору(неинициализирован)
+    bool pointsAtNULL(int&, int);              //проверка на то, что указатель обращается к null
+    bool isEmpty();                            //Проверка заполнености кнф
+    void makeDangling(int&, int);              //удаление исходящей ссылки
+    void merge(CNF&, int&, int&, int);         //слияние двух кнф
+    
+    //методы для построения 2-кнф
+    std::vector<std::pair<int, int>> build2CNF();
+    void print2CNF(const std::vector<std::pair<int, int>>& formula);
+    std::string get2CNFString(const std::vector<std::pair<int, int>>& formula);
+    void print2CNFNumeric(const std::vector<std::pair<int, int>>& formula);
+    
+    //методы для работы с sat-решателем
+    bool isSatisfiable();
+    void printSATResult();
+    Formula get2CNFFormula();
 };
 
 CNF::CNF() {
     nVar = 0;
-    pos_type1 = new BoolVector[1]();
+    pos_type1 = new BoolVector[1]();         //создаем вектор длины 1, так, чтобы в кнф всегда
+                                             //был один элемент - null
     pos_type2 = new BoolVector[1]();
-    neg = new BoolVector[1]();
+    neg = new BoolVector[1]();               //пример - neg[0] = [0]
     ptr_var = BoolVector(1);
-    /*
-    pos_type1 = new BoolVector[1];
-    pos_type2 = new BoolVector[1];
-    neg = new BoolVector[1];
-    
-    pos_type1[0] = BoolVector(1);
-    pos_type2[0] = BoolVector(1);
-    neg[0] = BoolVector(1);
-     */
     
     var_names.push_back("nullptr");
 }
@@ -368,7 +500,7 @@ CNF& CNF::operator=(const CNF& other) {
     return *this;
 }
 
-void CNF::resizeB(int new_nVar) {
+void CNF::resizeB(int new_nVar) {                              //для изменения размера кнф(при удалении/добалении)
     BoolVector* new_pos1 = new BoolVector[new_nVar + 1];
     BoolVector* new_pos2 = new BoolVector[new_nVar + 1];
     BoolVector* new_neg = new BoolVector[new_nVar + 1];
@@ -410,7 +542,7 @@ void CNF::resizeB(int new_nVar) {
     nVar = new_nVar;
 }
 
-void CNF::printCNF() {
+void CNF::printCNF() {                       //вывод таблицы
     for (int i = 0; i <= nVar; i++) {
         std::cout<<var_names[i]<< ' ';
     }
@@ -429,8 +561,8 @@ void CNF::printVarNames() {
             std::cout << std::endl;
 }
 
+//Функция для поиска узла по имени в КНФ
 int CNF::findVarIndex(const std::string& name) const {
-    //Функция для поиска узла по имени в КНФ
     for (int i = 0; i < var_names.size(); i++) {
         if (var_names[i] == name) {
             return i;
@@ -439,24 +571,16 @@ int CNF::findVarIndex(const std::string& name) const {
     return -1;
 }
 
+//Функция для поиска следующего узла на который ссылается переменная-указатель
 int CNF::findFieldInd(int indOut) const {
-    //Функция для поиска следующего узла на который ссылается узел indOut
     int ind = -1;
     for (int i = 1; i <= nVar; i++) {
         if(pos_type1[indOut][i] == 1) ind = i;
     }
     return ind;
 }
-/*
-int CNF::findFieldIndType2(int indOut) const {
-    //Функция для поиска предыдущего узла на который ссылается узел indOut
-    int ind = -1;
-    for (int i = 1; i <= nVar; i++) {
-        if(pos_type2[indOut][i] == 1) ind = i;
-    }
-    return ind;
-}
-*/
+
+//удаление узла
 void CNF::deleteNode(std::string& name) {
     //"Вырезаем"(сдвигаем следующие за ним узлы) удаляемый узел из строк
     int ind = findVarIndex(name);
@@ -500,25 +624,30 @@ void CNF::deleteNode(std::string& name) {
         neg[i].Set0(nVar);
     }
     nVar--;
-    int indToDel = findVarIndex(name);
+    
+    int indToDel = findVarIndex(name);                //ищем по имени какой индекс удалить
     var_names.erase(var_names.begin() + indToDel);
     
     resizeB(nVar);
 }
 
+//удаление с перенос висячих указателей
 void CNF::freeNode(int& ind, std::vector<CNF>& danglingPointers, int nFields = 1, int fieldType = 1) {
     int indToFree;
-    if (fieldType == 1) {
+    
+    if (fieldType == 1) {                      //ищем индес узла, который хотим освободить
         indToFree = pos_type1[ind].getLink();
     } else {
         indToFree = pos_type2[ind].getLink();
     }
-    std::string nameToFree = var_names[indToFree];
     
-    std::unordered_set<std::string> namesToDel;
+    std::string nameToFree = var_names[indToFree];       //запоминаем его имя, т.к. при удалении других объектов
+                                                         //индексы меняются
+    
+    std::unordered_set<std::string> namesToDel;         //Смотрим, не появилось ли висящих указателей
     for (int i = 1; i <= nVar; i++) {
         if (neg[indToFree][i] && ptr_var[i]) {
-            CNF pointer;
+            CNF pointer;                                  //переносим в новую кнф
             pointer.addPtrVar(var_names[i], nFields);
             danglingPointers.push_back(pointer);
             namesToDel.insert(var_names[i]);
@@ -527,9 +656,11 @@ void CNF::freeNode(int& ind, std::vector<CNF>& danglingPointers, int nFields = 1
     for (std::string name: namesToDel) {
         deleteNode(name);
     }
+    
     deleteNode(nameToFree);
 }
 
+//Обходим, начиная с переменной-указателя
 void CNF::bypass(int cur, int prev, std::unordered_set<int>& list, std::unordered_set<int>& visited) {
     // Если узел уже посещен, выходим чтобы избежать зацикливания
     if (visited.count(cur)) {
@@ -550,6 +681,7 @@ void CNF::bypass(int cur, int prev, std::unordered_set<int>& list, std::unordere
     }
 }
 
+//функция для обработки списков, сформированных обходом bypass
 bool hasIntersection(const std::unordered_set<int>& set1, const std::unordered_set<int>& set2) {
     for (int elem : set1) {
         if (set2.count(elem)) return true;
@@ -557,12 +689,13 @@ bool hasIntersection(const std::unordered_set<int>& set1, const std::unordered_s
     return false;
 }
 
+//ищем уникальные списки, для разделения кнф
 std::vector<std::unordered_set<int>> findUnique(const std::vector<std::unordered_set<int>>& lists) {
     std::vector<std::unordered_set<int>> result;
     std::vector<bool> merged(lists.size(), false);
     
     for (int i = 0; i < lists.size(); i++) {
-        if (merged[i]) continue;
+        if (merged[i]) continue;                 //если объект уже попадался
         
         std::unordered_set<int> current = lists[i];
         merged[i] = true;
@@ -572,7 +705,7 @@ std::vector<std::unordered_set<int>> findUnique(const std::vector<std::unordered
             changed = false;
             for (int j = 0; j < lists.size(); j++) {
                 if (!merged[j] && hasIntersection(current, lists[j])) {
-                    current.insert(lists[j].begin(), lists[j].end());
+                    current.insert(lists[j].begin(), lists[j].end());       //добавляем очередной объект в список
                     merged[j] = true;
                     changed = true;
                 }
@@ -585,15 +718,17 @@ std::vector<std::unordered_set<int>> findUnique(const std::vector<std::unordered
     return result;
 }
 
+//Проверка и корректировка фиктивных связей
 void CNF::checkFictiousBonds(std::unordered_set<int>& list, int nFields) {
     int ctr = 0;
-    if (nFields == 2){
+    //для формирования фиктивных связей нужно чтобы каждый объект указывал куда-либо(узел или null)
+    if (nFields == 2){     //если работаем с двусвязным
         for (int nodeInd: list) {
             if (pos_type1[nodeInd].hasWeight() && pos_type2[nodeInd].hasWeight()){
-                ctr++;
+                ctr++;              //для двусвязного списка вектор pos_type2 для переменных-указателей сразу инициализируется с ссылкой на null
             }
         }
-    } else {
+    } else {               //если работаем с односвязным
         for (int nodeInd: list) {
             if (pos_type1[nodeInd].hasWeight()){
                 ctr++;
@@ -601,14 +736,14 @@ void CNF::checkFictiousBonds(std::unordered_set<int>& list, int nFields) {
         }
     }
     if (ctr == list.size()) {
-        for (int nodeInd: list) {
+        for (int nodeInd: list) {             //Если все объекты "закрыты", то мы проводим фиктивные связи из null в переменные-указатели
             if (ptr_var[nodeInd] == 1) {
                 pos_type1[0].Set1(nodeInd);
                 neg[nodeInd].Set1(0);
             }
         }
     } else {
-        for (int nodeInd: list) {
+        for (int nodeInd: list) {            //Иначе мы удаляем все фиктивные связи
             if (ptr_var[nodeInd] == 1) {
                 pos_type1[0].Set0(nodeInd);
                 neg[nodeInd].Set0(0);
@@ -617,9 +752,10 @@ void CNF::checkFictiousBonds(std::unordered_set<int>& list, int nFields) {
     }
 }
 
+//для разделения кнф
 CNF CNF::divide(int nFields) {
     CNF cnf;
-    std::vector<std::unordered_set<int>> lists;
+    std::vector<std::unordered_set<int>> lists;     //для каждой переменной-указателся составляем списки объектов, достижимых из нее
     for (int i = 1; i <= nVar; i++) {
         if (ptr_var[i] == 1) {
             std::unordered_set<int> list;
@@ -628,10 +764,9 @@ CNF CNF::divide(int nFields) {
             lists.push_back(list);
         }
     }
-    std::vector<std::unordered_set<int>> listsUnique = findUnique(lists);
-    //if (listsUnique.size() == 1 || listsUnique.size() == 0) {
+    std::vector<std::unordered_set<int>> listsUnique = findUnique(lists);    //т.к. эти списки могут пересекаться, находим пересечения и составляем уникальные списки
+    
     if( listsUnique.size() == 0) {
-        std::cout<<"ПОЧЕМУ НЕТ ПЕРЕМЕННЫХ????"<<std::endl;
         return cnf;
     }
     if (listsUnique.size() == 1) {
@@ -652,7 +787,7 @@ CNF CNF::divide(int nFields) {
     
     int newInd = 1;
     
-    for (int oldInd: listsUnique[shortInd]) {
+    for (int oldInd: listsUnique[shortInd]) {               //переопределяем индексы
         oldToNew[oldInd] = newInd;
         cnf.var_names.push_back(var_names[oldInd]);
         if (ptr_var[oldInd] == 1) cnf.ptr_var.Set1(newInd);
@@ -684,7 +819,8 @@ CNF CNF::divide(int nFields) {
             cnf.neg[0].Set1(newFrom);
         }
     }
-    std::unordered_set<std::string> namesToDel;
+    
+    std::unordered_set<std::string> namesToDel;         //Удаляем перенесенные узлы из старой кнф
     for (int oldInd: listsUnique[shortInd]) {
         namesToDel.insert(var_names[oldInd]);
     }
@@ -693,32 +829,38 @@ CNF CNF::divide(int nFields) {
     }
     
     std::unordered_set<int> newList;
-    std::unordered_set<int> newVisited; // Добавлено
+    std::unordered_set<int> newVisited;
     for (int i = 1; i <= nVar; i++) {
         if (ptr_var[i] == 1) {
-            bypass(i, -1, newList, newVisited); // Добавлен параметр visited
+            bypass(i, -1, newList, newVisited);
         }
     }
+    
     //Перестроим фиктивные связи для оставшихся в старой кнф переменных
     for (int i = 0; i < listsUnique.size(); i++) {
         if (i != shortInd) {
             checkFictiousBonds(newList, nFields);
         }
     }
+    
     //Перестроим фиктивные связи для переменных новой кнф
     cnf.checkFictiousBonds(newInds, nFields);
     
     return cnf;
 }
 
+//добаление участка памяти в кнф
 void CNF::addAlMem(std::string nameIn, int indFrom, int type=1) {
     var_names.push_back(nameIn);
+    
     resizeB(nVar+1);
+    
     BoolVector allZ(nVar);
-    if (type == 1) {
-        pos_type1[indFrom] = pos_type1[indFrom] & allZ;
+    if (type == 1) {                                        //если node->next = malloc или node = malloc
+        pos_type1[indFrom] = pos_type1[indFrom] & allZ;                         //удаляем старую связь из узла с индексом indFrom
         pos_type1[indFrom].Set1(nVar);
-    } else {
+    } else {                                                //если node->prev = malloc
+        neg[pos_type1[indFrom].getLinkZeroIncluded()].Set0(indFrom);
         pos_type2[indFrom] = pos_type2[indFrom] & allZ;
         pos_type2[indFrom].Set1(nVar);
     }
@@ -726,6 +868,7 @@ void CNF::addAlMem(std::string nameIn, int indFrom, int type=1) {
     neg[nVar].Set1(indFrom);
 }
 
+//добавление переменной-указателей    случай node* var; (объявление без инициализации)
 void CNF::addPtrVar(std::string name, int nFields) {
     var_names.push_back(name);
     resizeB(nVar+1);
@@ -735,15 +878,16 @@ void CNF::addPtrVar(std::string name, int nFields) {
     ptr_var.Set1(1);
 }
 
+//добавление null
 void CNF::addNULL(int indOut, int type = 1) {
-    if (type == 1) {
+    if (type == 1) {             //var = null; или var->next = null;
         int prevLink = pos_type1[indOut].getLinkZeroIncluded();   //ищем предыдущую связь
         if (prevLink > 0){
             neg[prevLink].Set0(indOut);                         //разрываем предыдущую связь
             pos_type1[indOut].Set0(prevLink);
         }
         pos_type1[indOut].Set1(0);
-    } else {
+    } else {                    //var->prev = null;
         int prevLink = pos_type2[indOut].getLinkZeroIncluded();   //ищем предыдущую связь
         if (prevLink > 0){
             neg[prevLink].Set0(indOut);                         //разрываем предыдущую связь
@@ -754,7 +898,8 @@ void CNF::addNULL(int indOut, int type = 1) {
     neg[0].Set1(indOut);
 }
 
-void CNF::point(int& ind, std::string nameOut, int& type) {
+
+void CNF::point(int& ind, std::string nameOut, int& type) {       //var = ...(только если левая часть не имеет полей)
     var_names.push_back(nameOut);
     resizeB(nVar+1);
     
@@ -765,6 +910,7 @@ void CNF::point(int& ind, std::string nameOut, int& type) {
     ptr_var.Set1(nVar);
 }
 
+//переопредение связей
 void CNF::rePoint(int& ind, int& out, int& type, int& nFields) {
     int prevLink;
     if (type == 1) {
@@ -795,6 +941,7 @@ void CNF::rePoint(int& ind, int& out, int& type, int& nFields) {
     }
 }
 
+//для проверки, указывает ли объект на что-либо
 bool CNF::isDangling(int& ind, int type=1) {
     BoolVector allZ(nVar);
     if (type == 1) {
@@ -806,17 +953,20 @@ bool CNF::isDangling(int& ind, int type=1) {
     return false;
 }
 
+//проверка, указывает ли на null
 bool CNF::pointsAtNULL(int& ind, int type = 1) {
     if (type == 1 && pos_type1[ind][0] == 1) return true;
     else if (type == 2 && pos_type2[ind][0] == 1) return true;
     return false;
 }
 
+//проверка, если в кнф переменные
 bool CNF::isEmpty() {
     if (nVar == 0) return true;
     return false;
 }
 
+//удалить связь
 void CNF::makeDangling(int& ind, int fieldType=1) {
     BoolVector allZ(nVar+1);
     if (fieldType == 1) {
@@ -832,24 +982,25 @@ void CNF::makeDangling(int& ind, int fieldType=1) {
     }
 }
 
+//слияние кнф
 void CNF::merge(CNF& right, int& from, int& to, int fieldType = 1) {
     std::unordered_set<int> list;
-    std::unordered_set<int> visited; // Добавлено
-    for (int i = 1; i <= right.nVar; i++) {
+    std::unordered_set<int> visited;                //обходим список, так как в правой кнф могут быть потерянные узлы, которые при обходе не войдут в список
+    for (int i = 1; i <= right.nVar; i++) {         //для переноса
         if (right.ptr_var[i] == 1) {
-            right.bypass(i, -1, list, visited); // Добавлен параметр visited
+            right.bypass(i, -1, list, visited);
         }
     }
     int size = (int)list.size();
     resizeB(nVar+size);
-    std::vector<int> oldToNew(right.nVar+1, -1);
+    std::vector<int> oldToNew(right.nVar+1, -1);             //соотношение старых индексов в старой кнф с новыми индексами в новой
     std::unordered_set<int> newInds;
     
     int newInd = nVar - size + 1;
     
     std::unordered_set<std::string> namesToDel;
     
-    for (int oldInd: list) {
+    for (int oldInd: list) {                                    //определяем соотношение старых-новых индексов
         oldToNew[oldInd] = newInd;
         std::string name = right.var_names[oldInd];
         var_names.push_back(name);
@@ -859,7 +1010,8 @@ void CNF::merge(CNF& right, int& from, int& to, int fieldType = 1) {
         
         namesToDel.insert(name);
     }
-    for (int oldFrom: list) {
+    
+    for (int oldFrom: list) {                               //переносим связи
         int newFrom = oldToNew[oldFrom];
         for (int oldTo: list) {
             int newTo = oldToNew[oldTo];
@@ -885,16 +1037,18 @@ void CNF::merge(CNF& right, int& from, int& to, int fieldType = 1) {
     }
     
     
-    for (std::string name: namesToDel) {
+    for (std::string name: namesToDel) {        //удаляем объекты из старой кнф
         right.deleteNode(name);
     }
     
     int newTo = oldToNew[to];
     
-    if (fieldType == 1) {
+    if (fieldType == 1) {             //если var = .. или var->next = ..
+        neg[0].Set0(from);
         pos_type1[from] = pos_type1[newTo];
         neg[pos_type1[from].getLink()].Set1(from);
-    } else {
+    } else {                          //если var->prev = ..
+        neg[0].Set0(from);
         pos_type2[from] = pos_type1[newTo];
         neg[pos_type2[from].getLink()].Set1(from);
     }
@@ -902,6 +1056,7 @@ void CNF::merge(CNF& right, int& from, int& to, int fieldType = 1) {
     
 }
 
+//поиск объекта по имени: индекс кнф, в котором он находится и индекс объекта
 std::pair<int, int> find(std::vector<CNF>& CNFcontainer, std::string name){
     for (int i = 0; i < CNFcontainer.size(); i++) {
         int varIndex = CNFcontainer[i].findVarIndex(name);
@@ -912,20 +1067,26 @@ std::pair<int, int> find(std::vector<CNF>& CNFcontainer, std::string name){
     return {-1, -1};
 }
 
-void makeCNF(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::vector<std::string>& fields) {
+//обработка json-файла, алгоритм формирования булевой таблицы кнф
+void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::vector<std::string>& fields) {
     int nFields = (int)fields.size();
     
     for (int i = 1; i < parsedJSON.size(); i++) {
-        if (i == 45) {
-            std::cout<<"Hi"<<std::endl;
-        }
+    //for (int i = 1; i < 26; i++) {               стоппер для проверки промежуточных значений
+    //    if (i == 25) {
+    //        std::cout<<"i"<<std::endl;
+    //    }
         //Найдем индекс кнф, в которой находится переменная с которой мы работаем, индекс этой переменной
         //Если переменной с таким именем нет вернём {-1, -1}
         std::pair<int, int> varInd = find(CNFcontainer, parsedJSON[i]["name"]);
-        int type = 1;
+        int type = 1;     //тип поля с которым мы работаем - 1 для указателей и поля next, 2 для поля prev
+        
+        //var->NODE1->(next) NODE2
+        //если нет обращения к полю мы работаем с var(определяем связи для неё, меняя первую стрелку)
+        //если есть обращение к полю работаем с NODE1 и определяем связи для неё, меняя вторую стрелку
         
         std::string name = parsedJSON[i]["name"];
-        if (parsedJSON[i].contains("f")) {
+        if (parsedJSON[i].contains("f")) {                          //если есть обращение к полю, ищем индекс NODE1
             if (nFields == 2 && parsedJSON[i]["f"] == fields[1]){
                 type = 2;
             }
@@ -934,21 +1095,19 @@ void makeCNF(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::
         }
         
         std::string value;
-        if (parsedJSON[i].contains("value") && !parsedJSON[i]["value"].is_structured()) {
+        if (parsedJSON[i].contains("value") && !parsedJSON[i]["value"].is_structured()) { //если правая часть var/null
             value = parsedJSON[i]["value"];
         }
-        /*
-        if (CNFcontainer.size()>0 && varInd.first!=-1) {
-            CNFcontainer[varInd.first].printCNF();
-        }
-         */
         
-        if (parsedJSON[i].contains("op") && CNFcontainer[varInd.first].get_nVar() > 1) {
+        if (parsedJSON[i].contains("op") && CNFcontainer[varInd.first].get_nVar() > 1) { //free
             std::vector<CNF> danglingPointers;
+            //удаляем узел
             CNFcontainer[varInd.first].freeNode(varInd.second, danglingPointers, nFields, type);
+            //если остались висячие указатели - переносим их по разным новым кнф(они будут единственными объектами)
             for (int i = 0; i < danglingPointers.size(); i++) {
                 CNFcontainer.push_back(danglingPointers[i]);
             }
+            //удаляем висячие указатели из старой кнф
             if (CNFcontainer[varInd.first].get_nVar() == 0) {
                 CNFcontainer.erase(CNFcontainer.begin() + varInd.first);
             } else {
@@ -956,62 +1115,60 @@ void makeCNF(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::
                 if (nCnf.get_nVar() > 0) CNFcontainer.push_back(nCnf);
             }
 
-        } else if (!parsedJSON[i].contains("value")) {
+        } else if (!parsedJSON[i].contains("value")) {     //node* var;
             CNF nCnf;
             nCnf.addPtrVar(parsedJSON[i]["name"], nFields);
             CNFcontainer.push_back(nCnf);
-        } else if (parsedJSON[i]["value"] == "NULL") {
-            if (varInd.first == -1 && varInd.second == -1) {
+            
+        } else if (parsedJSON[i]["value"] == "NULL") {          //var = NULL;
+            if (varInd.first == -1 && varInd.second == -1) {    //если имени переменной не содержится ни в одной кнф
                 CNF nCnf;
-                nCnf.addPtrVar(parsedJSON[i]["name"], nFields);
-                nCnf.addNULL(1);
+                nCnf.addPtrVar(parsedJSON[i]["name"], nFields);   //создаем новую
+                nCnf.addNULL(1);                                    //указываем на null
                 std::unordered_set<int> list;
                 list.insert(1);
-                nCnf.checkFictiousBonds(list, nFields);
+                nCnf.checkFictiousBonds(list, nFields);             //проводим фиктивные связи
                 CNFcontainer.push_back(nCnf);
             } else {
-                CNFcontainer[varInd.first].addNULL(varInd.second, type);
-                CNF nCnf = CNFcontainer[varInd.first].divide(nFields);
-                if (nCnf.get_nVar() > 0) CNFcontainer.push_back(nCnf);
+                CNFcontainer[varInd.first].addNULL(varInd.second, type);    //если есть указываем на null
+                CNF nCnf = CNFcontainer[varInd.first].divide(nFields);      //разделяем
+                if (nCnf.get_nVar() > 0) CNFcontainer.push_back(nCnf);      //если разделять нечего - nCnf окажется пустой
             }
-        } else if (value[0] == 'N') {
-            if (varInd.first == -1 && varInd.second == -1) {
+        } else if (value[0] == 'N') {                            //если значение - выделенная память (в моем формате json'а память N1, N2 и тд)
+            if (varInd.first == -1 && varInd.second == -1) {     //node* var = malloc;
                 CNF nCnf;
-                nCnf.addPtrVar(parsedJSON[i]["name"], nFields);
-                nCnf.addAlMem(parsedJSON[i]["value"], 1, type);
+                nCnf.addPtrVar(parsedJSON[i]["name"], nFields);   //создаем новую кнф
+                nCnf.addAlMem(parsedJSON[i]["value"], 1, type);   //заносим узел
                 CNFcontainer.push_back(nCnf);
             } else {
-                CNFcontainer[varInd.first].addAlMem(parsedJSON[i]["value"], varInd.second, type);
-                CNF nCnf = CNFcontainer[varInd.first].divide(nFields);
+                CNFcontainer[varInd.first].addAlMem(parsedJSON[i]["value"], varInd.second, type);  //добавляем узел к кнф указателя
+                CNF nCnf = CNFcontainer[varInd.first].divide(nFields);               //разделяем, там же переопределяются фиктивне связи
                 if (nCnf.get_nVar() > 0) CNFcontainer.push_back(nCnf);
             }
         } else {
-            std::pair<int, int> varInd2; //не может быть {-1, -1}, иначе код не скомпилируется
-            int type2 = 1;
+            std::pair<int, int> varInd2; //не может быть {-1, -1}, иначе исходный код не скомпилируется
+            int type2 = 1;   //тип обращения к объекту для правой части
             std::string name2;
-            if (parsedJSON[i]["value"].is_structured()) {
+            if (parsedJSON[i]["value"].is_structured()) {                         //если .. = var->next / .. = var->prev
+                //var->Node1->Node2
+                //когда работаем с правой частью мы ссылаемся на узел, а на на переменную, поэтому при ..=var мы работаем не с индексом var, а с индексом Node1
                 varInd2 = find(CNFcontainer, parsedJSON[i]["value"]["name"]);
                 if (nFields == 2 && parsedJSON[i]["value"]["f"] == fields[1]){
                     type2 = 2;
                 }
+                //а если .. = var->next мы работаем с индексом Node2
                 varInd2.second = CNFcontainer[varInd2.first].findFieldInd(varInd2.second);
                 name2 = CNFcontainer[varInd2.first].get_varName(varInd2.second);
             } else {
                 varInd2 = find(CNFcontainer, parsedJSON[i]["value"]);
                 name2 = CNFcontainer[varInd2.first].get_varName(varInd2.second);
             }
-            /*
-            if (CNFcontainer.size()>0   && varInd2.first != -1) {
-                CNFcontainer[varInd2.first].printCNF();
-            }
-            */
                         
-            if (!parsedJSON[i].contains("f")) {       //если левая часть переменная-указатель
-                if (CNFcontainer[varInd2.first].pointsAtNULL(varInd2.second, type2)) {
-                    //правая часть указывает на нулл
+            if (!parsedJSON[i].contains("f")) {       //если var = ..
+                if (CNFcontainer[varInd2.first].pointsAtNULL(varInd2.second, type2)) { //Например, var = var2->next             var2->node->null
                     if (varInd.first == -1 || CNFcontainer[varInd.first].get_nVar() > 1) {
                         if (varInd.first != -1 && CNFcontainer[varInd.first].get_nVar() > 1) {
-                            CNFcontainer[varInd.first].deleteNode(name);
+                            CNFcontainer[varInd.first].deleteNode(name);       //если левая часть есть в какой-то кнф, удаляем её из этой кнф
                         }
                         CNF nCnf;
                         nCnf.addPtrVar(parsedJSON[i]["name"], nFields);
@@ -1019,58 +1176,56 @@ void makeCNF(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::
                         varInd.first = (int)CNFcontainer.size()-1;
                         varInd.second = 1;
                     }
-                    if (!CNFcontainer[varInd.first].pointsAtNULL(varInd.second, type)) {
+                    if (!CNFcontainer[varInd.first].pointsAtNULL(varInd.second, type)) { //если левая часть не показывает на null
                         CNFcontainer[varInd.first].addNULL(varInd.second, type2);
                         std::unordered_set<int> list;
                         list.insert(1);
                         CNFcontainer[varInd.first].checkFictiousBonds(list, nFields);
                     }
-                    //если левая тоже указывает на нулл, то пропускаем
-                } else if (CNFcontainer[varInd2.first].isDangling(varInd2.second)) {
+                    //если левая тоже указывает на null, то пропускаем
+                    
+                } else if (CNFcontainer[varInd2.first].isDangling(varInd2.second)) {  //если var = var2       var2->node->
                     //если правая часть висячий указатель
                     if (varInd.first == -1 || CNFcontainer[varInd.first].get_nVar() > 1) {
                         if (varInd.first != -1 && CNFcontainer[varInd.first].get_nVar() > 1) {
-                            CNFcontainer[varInd.first].deleteNode(name);
+                            CNFcontainer[varInd.first].deleteNode(name);                            //удаляем левый из старой кнф
                         }
                         CNF nCnf;
-                        nCnf.addPtrVar(parsedJSON[i]["name"], 1);
+                        nCnf.addPtrVar(parsedJSON[i]["name"], 1);                //переносим указатель в новую кнф
                         CNFcontainer.push_back(nCnf);
                         varInd.first = (int)CNFcontainer.size()-1;
                         varInd.second = 1;
                     }
-                    if (!CNFcontainer[varInd.first].isDangling(varInd.second, type)) {
+                    if (!CNFcontainer[varInd.first].isDangling(varInd.second, type)) {    //var-> null
                         //если остался вариант указывает на нулл
                         CNFcontainer[varInd.first].makeDangling(varInd.second, type);
                     }
-                    //если левая часть тоже висячий указатель, то пропускаем
+                    //если левая часть тоже висячий указатель, то ничего не делаем
                 
                 } else {    //если правая часть указывает на участок памяти
-                    
                     if (varInd.first == varInd2.first){    //если они в одной кнф
-                        CNFcontainer[varInd2.first].rePoint(varInd2.second, varInd.second, type, nFields);
+                        CNFcontainer[varInd2.first].rePoint(varInd2.second, varInd.second, type, nFields); //переносим связь
                     }
                     else {     //если в разных
-                        CNFcontainer[varInd2.first].point(varInd2.second, name, type);
+                        CNFcontainer[varInd2.first].point(varInd2.second, name, type);        //добавляем указатель в кнф правой части
                         if (varInd.first != -1) {
-                            CNFcontainer[varInd.first].deleteNode(name);
+                            CNFcontainer[varInd.first].deleteNode(name);                       //удаляем из старой кнф и разделяем
                             CNF nCnf = CNFcontainer[varInd2.first].divide(nFields);
                             if (CNFcontainer[varInd.first].get_nVar() == 0) {
-                                CNFcontainer.erase(CNFcontainer.begin() + varInd.first);
+                                CNFcontainer.erase(CNFcontainer.begin() + varInd.first);       //если старая кнф осталсь пустой, удаляем её
                             }
-                        } else {
-                            CNF nCnf = CNFcontainer[varInd2.first].divide(nFields);
                         }
                     }
                 }
             } else {
-                //левая часть обращается к полю, правая без разницы
-                if (CNFcontainer[varInd2.first].pointsAtNULL(varInd2.second, type2)) {
+                //левая часть обращается к полю, правая без разницы           var->next = ..
+                if (CNFcontainer[varInd2.first].pointsAtNULL(varInd2.second, type2)) {         //var2->null или var2->node->null
                     CNFcontainer[varInd.first].addNULL(varInd.second, type);
-                } else if (CNFcontainer[varInd2.first].isDangling(varInd2.second, type)) {
+                } else if (CNFcontainer[varInd2.first].isDangling(varInd2.second, type)) {      //var2->    или var2->node->
                     CNFcontainer[varInd.first].makeDangling(varInd.second, type);
-                } else if (varInd.first != varInd2.first){
+                } else if (varInd.first != varInd2.first){          //левая и правая часть в разных кнф  и var2->node или var2->node->node1
                     CNFcontainer[varInd.first].merge(CNFcontainer[varInd2.first], varInd.second, varInd2.second, type);
-                } else {
+                } else {                                            //в одной кнф   и var2->node или var2->node->node1
                     CNFcontainer[varInd2.first].rePoint(varInd2.second, varInd.second, type, nFields);
                 }
                 CNF nCnf = CNFcontainer[varInd.first].divide(nFields);
@@ -1087,21 +1242,147 @@ void makeCNF(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::
     }
 }
 
+// Реализация методов для построения 2-КНФ
+std::vector<std::pair<int, int>> CNF::build2CNF() {
+    std::vector<std::pair<int, int>> formula;
+    std::vector<bool> used_variables(nVar + 1, false);
+
+    // Основной алгоритм построения 2-КНФ
+    for (int i = 0; i <= nVar; i++) {
+        for (int j = 0; j <= nVar; j++) {
+            if (neg[j][i] == 1) {
+                // Добавляем дизъюнкт: i OR -j
+                formula.push_back(std::make_pair(i, -j));
+                used_variables[i] = true;
+                used_variables[j] = true;
+            }
+        }
+    }
+
+    // Добавляем переменные, которые ни разу не попали в формулу
+    for (int i = 0; i <= nVar; i++) {
+        if (!used_variables[i] && i != 0) { // исключаем nullptr (индекс 0)
+            formula.push_back(std::make_pair(i, -i));
+        }
+    }
+
+    return formula;
+}
+
+void CNF::print2CNF(const std::vector<std::pair<int, int>>& formula) {
+    std::cout << "2-CNF формула:" << std::endl;
+    for (int k = 0; k < formula.size(); k++) {
+        const std::pair<int, int>& clause = formula[k];
+        int var1 = clause.first;
+        int var2 = clause.second;
+        
+        std::cout << "(";
+        if (var1 > 0) {
+            std::cout << var_names[var1];
+        } else {
+            std::cout << "¬" << var_names[-var1];
+        }
+        
+        std::cout << " ∨ ";
+        
+        if (var2 > 0) {
+            std::cout << var_names[var2];
+        } else {
+            std::cout << "¬" << var_names[-var2];
+        }
+        std::cout << ")" << std::endl;
+    }
+}
+
+std::string CNF::get2CNFString(const std::vector<std::pair<int, int>>& formula) {
+    std::string result;
+    for (int i = 0; i < formula.size(); i++) {
+        const std::pair<int, int>& clause = formula[i];
+        int var1 = clause.first;
+        int var2 = clause.second;
+        
+        result += "(";
+        if (var1 > 0) {
+            result += var_names[var1];
+        } else {
+            result += "¬" + var_names[-var1];
+        }
+        
+        result += " ∨ ";
+        
+        if (var2 > 0) {
+            result += var_names[var2];
+        } else {
+            result += "¬" + var_names[-var2];
+        }
+        result += ")";
+        
+        if (i < formula.size() - 1) {
+            result += " ∧ ";
+        }
+    }
+    return result;
+}
+
+void CNF::print2CNFNumeric(const std::vector<std::pair<int, int>>& formula) {
+    std::cout << "2-CNF формула (числовое представление):" << std::endl;
+    for (int i = 0; i < formula.size(); i++) {
+        const std::pair<int, int>& clause = formula[i];
+        std::cout << "(" << clause.first << " ∨ " << clause.second << ")" << std::endl;
+    }
+}
+
+Formula CNF::get2CNFFormula() {
+    std::vector<std::pair<int, int>> formula = build2CNF();
+    return formula;
+}
+
+bool CNF::isSatisfiable() {
+    Formula formula = get2CNFFormula();
+    
+    if (formula.empty()) {
+        return true; // empty formula is always satisfiable
+    }
+    
+    TwoSAT solver;
+    return solver.solve(formula);
+}
+
+void CNF::printSATResult() {
+    Formula formula = get2CNFFormula();
+    
+    std::cout << "2-CNF формула:" << std::endl;
+    for (size_t i = 0; i < formula.size(); i++) {
+        const Clause& clause = formula[i];
+        std::cout << "(" << clause.first << " ∨ " << clause.second << ")";
+        if (i < formula.size() - 1) {
+            std::cout << " ∧ ";
+        }
+    }
+    std::cout << std::endl;
+    
+    bool satisfiable = isSatisfiable();
+    std::cout << "2-SAT результат: ";
+    if (satisfiable) {
+        std::cout << "SATISFIABLE" << std::endl;
+    } else {
+        std::cout << "UNSATISFIABLE" << std::endl;
+    }
+}
+
 int main() {
     std::ifstream data("/Users/liza/School/NIR/NIR/primer.json");
     if (!data.is_open()) {
         std::cerr << "Ошибка открытия файла" << std::endl;
         return 1;
     }
-                            
+    
+    //парсим json
     json parsedJSON = json::parse(data);
-    //std::cout << parsedJSON.dump(2) << std::endl;
-    for (int i = 1; i < parsedJSON.size(); i++) {
-        std::cout<<i<<"    "<<parsedJSON[i]<<std::endl;
-    }
     
     std::vector<CNF> CNFcontainer;
                              
+    //определяем тип - односвязный или двусвязный
     int fields_num = parsedJSON[0]["fields_num"];
     std::vector<std::string> fields;
     if (fields_num == 1) {
@@ -1110,12 +1391,20 @@ int main() {
         fields.push_back(parsedJSON[0]["fields"][0]);
         fields.push_back(parsedJSON[0]["fields"][1]);
     }
-    makeCNF(parsedJSON, CNFcontainer, fields);
-    /*
+    
+    //строим таблицу
+    makeBoolLinks(parsedJSON, CNFcontainer, fields);
+    
+    std::cout << "\nРЕЗУЛЬТАТЫ 2-SAT ПРОВЕРКИ: " << std::endl;
     for (int i = 0; i < CNFcontainer.size(); i++) {
+        std::cout << "\n=== CNF " << i + 1 << " ===" << std::endl;
         CNFcontainer[i].printCNF();
+            
+        std::cout << "--- 2-SAT Анализ ---" << std::endl;
+        CNFcontainer[i].printSATResult();
+        std::cout << std::endl << std::endl;
     }
-     */
+
                             
     data.close();
                             
