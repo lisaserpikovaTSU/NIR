@@ -1243,16 +1243,16 @@ void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const
 }
 
 // Реализация методов для построения 2-КНФ
-std::vector<std::pair<int, int>> CNF::build2CNF() {
-    std::vector<std::pair<int, int>> formula;
+Formula CNF::build2CNF() {
+    Formula formula;
     std::vector<bool> used_variables(nVar + 1, false);
 
     // Основной алгоритм построения 2-КНФ
     for (int i = 0; i <= nVar; i++) {
         for (int j = 0; j <= nVar; j++) {
             if (neg[j][i] == 1) {
-                // Добавляем дизъюнкт: i OR -j
-                formula.push_back(std::make_pair(i, -j));
+                // Добавляем дизъюнкт: -i OR j
+                formula.push_back({-i, j});
                 used_variables[i] = true;
                 used_variables[j] = true;
             }
@@ -1262,7 +1262,7 @@ std::vector<std::pair<int, int>> CNF::build2CNF() {
     // Добавляем переменные, которые ни разу не попали в формулу
     for (int i = 0; i <= nVar; i++) {
         if (!used_variables[i] && i != 0) { // исключаем nullptr (индекс 0)
-            formula.push_back(std::make_pair(i, -i));
+            formula.push_back({-i, i}); 
         }
     }
 
@@ -1338,7 +1338,7 @@ Formula CNF::get2CNFFormula() {
 }
 
 bool CNF::isSatisfiable() {
-    Formula formula = get2CNFFormula();
+    Formula formula = build2CNF();
     
     if (formula.empty()) {
         return true; // empty formula is always satisfiable
@@ -1349,7 +1349,7 @@ bool CNF::isSatisfiable() {
 }
 
 void CNF::printSATResult() {
-    Formula formula = get2CNFFormula();
+    Formula formula = build2CNF();
     
     std::cout << "2-CNF формула:" << std::endl;
     for (size_t i = 0; i < formula.size(); i++) {
