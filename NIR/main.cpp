@@ -1250,8 +1250,8 @@ Formula CNF::build2CNF() {
     for (int i = 0; i <= nVar; i++) {
         for (int j = 0; j <= nVar; j++) {
             if (neg[j][i] == 1) {
-                // Добавляем дизъюнкт: -i OR j
-                formula.push_back({-i, j});
+                // Сдвигаем индексы: 0 -> 1, 1 -> 2, и т.д. чтобы учесть null (не можем добавить -0)
+                formula.push_back({-(i + 1), j + 1});
                 used_variables[i] = true;
                 used_variables[j] = true;
             }
@@ -1260,15 +1260,15 @@ Formula CNF::build2CNF() {
 
     // Добавляем черно-белое решение
     if (nVar > 0) {
-        // Белое решение: (1 ∨ 2 ∨ 3 ∨ ... ∨ nVar)
-        // В 2-КНФ представляем как: (1 ∨ 2) ∧ (2 ∨ 3) ∧ ... ∧ (nVar-1 ∨ nVar)
-        for (int i = 1; i <= nVar - 1; i++) {
+        // Белое решение: (1 ∨ 2 ∨ 3 ∨ ... ∨ nVar+1)
+        // В 2-КНФ представляем как: (1 ∨ 2) ∧ (2 ∨ 3) ∧ ... ∧ (nVar ∨ nVar+1)
+        for (int i = 1; i <= nVar; i++) {
             formula.push_back({i, i + 1});
         }
         
-        // Черное решение: (-1 ∨ -2 ∨ -3 ∨ ... ∨ -nVar)
-        // В 2-КНФ представляем как: (-1 ∨ -2) ∧ (-2 ∨ -3) ∧ ... ∧ (-(nVar-1) ∨ -nVar)
-        for (int i = 1; i <= nVar - 1; i++) {
+        // Черное решение: (-1 ∨ -2 ∨ -3 ∨ ... ∨ -(nVar+1))
+        // В 2-КНФ представляем как: (-1 ∨ -2) ∧ (-2 ∨ -3) ∧ ... ∧ (-(nVar) ∨ -nVar+1)
+        for (int i = 1; i <= nVar; i++) {
             formula.push_back({-i, -(i + 1)});
         }
     }
