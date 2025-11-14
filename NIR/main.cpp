@@ -414,15 +414,14 @@ public:
     void merge(CNF&, int&, int&, int);         //слияние двух кнф
     
     //методы для построения 2-кнф
-    std::vector<std::pair<int, int>> build2CNF();
-    void print2CNF(const std::vector<std::pair<int, int>>& formula);
-    std::string get2CNFString(const std::vector<std::pair<int, int>>& formula);
-    void print2CNFNumeric(const std::vector<std::pair<int, int>>& formula);
+    Formula build2CNF();
+    void print2CNF(const Formula& formula);
+    std::string get2CNFString(const Formula& formula);
+    void print2CNFNumeric(const Formula& formula);
     
     //методы для работы с sat-решателем
     bool isSatisfiable();
     void printSATResult();
-    Formula get2CNFFormula();
 };
 
 CNF::CNF() {
@@ -1259,17 +1258,25 @@ Formula CNF::build2CNF() {
         }
     }
 
-    // Добавляем переменные, которые ни разу не попали в формулу
-    for (int i = 0; i <= nVar; i++) {
-        if (!used_variables[i] && i != 0) { // исключаем nullptr (индекс 0)
-            formula.push_back({-i, i}); 
+    // Добавляем черно-белое решение
+    if (nVar > 0) {
+        // Белое решение: (1 ∨ 2 ∨ 3 ∨ ... ∨ nVar)
+        // В 2-КНФ представляем как: (1 ∨ 2) ∧ (2 ∨ 3) ∧ ... ∧ (nVar-1 ∨ nVar)
+        for (int i = 1; i <= nVar - 1; i++) {
+            formula.push_back({i, i + 1});
+        }
+        
+        // Черное решение: (-1 ∨ -2 ∨ -3 ∨ ... ∨ -nVar)
+        // В 2-КНФ представляем как: (-1 ∨ -2) ∧ (-2 ∨ -3) ∧ ... ∧ (-(nVar-1) ∨ -nVar)
+        for (int i = 1; i <= nVar - 1; i++) {
+            formula.push_back({-i, -(i + 1)});
         }
     }
 
     return formula;
 }
 
-void CNF::print2CNF(const std::vector<std::pair<int, int>>& formula) {
+void CNF::print2CNF(const Formula& formula) {
     std::cout << "2-CNF формула:" << std::endl;
     for (int k = 0; k < formula.size(); k++) {
         const std::pair<int, int>& clause = formula[k];
@@ -1294,7 +1301,7 @@ void CNF::print2CNF(const std::vector<std::pair<int, int>>& formula) {
     }
 }
 
-std::string CNF::get2CNFString(const std::vector<std::pair<int, int>>& formula) {
+std::string CNF::get2CNFString(const Formula& formula) {
     std::string result;
     for (int i = 0; i < formula.size(); i++) {
         const std::pair<int, int>& clause = formula[i];
@@ -1324,7 +1331,7 @@ std::string CNF::get2CNFString(const std::vector<std::pair<int, int>>& formula) 
     return result;
 }
 
-void CNF::print2CNFNumeric(const std::vector<std::pair<int, int>>& formula) {
+void CNF::print2CNFNumeric(const Formula& formula) {
     std::cout << "2-CNF формула (числовое представление):" << std::endl;
     for (int i = 0; i < formula.size(); i++) {
         const std::pair<int, int>& clause = formula[i];
@@ -1332,16 +1339,11 @@ void CNF::print2CNFNumeric(const std::vector<std::pair<int, int>>& formula) {
     }
 }
 
-Formula CNF::get2CNFFormula() {
-    std::vector<std::pair<int, int>> formula = build2CNF();
-    return formula;
-}
-
 bool CNF::isSatisfiable() {
     Formula formula = build2CNF();
     
     if (formula.empty()) {
-        return true; // empty formula is always satisfiable
+        return true;
     }
     
     TwoSAT solver;
