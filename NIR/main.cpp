@@ -385,6 +385,14 @@ public:
         return var_names[ind];
     }
     
+    int getUnsafeLink(int& indOut, int& type) { //поиск связанного узла, который потенциально может быть потерян
+        if (type == 1) {
+            return pos_type1[indOut].getLink();
+        } else {
+            return pos_type2[indOut].getLink();
+        }
+    }
+    
     void printCNF();
     void printVarNames();
     
@@ -1067,11 +1075,11 @@ std::pair<int, int> find(std::vector<CNF>& CNFcontainer, std::string name){
 }
 
 //обработка json-файла, алгоритм формирования булевой таблицы кнф
-void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::vector<std::string>& fields) {
+void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::vector<std::string>& fields, std::unordered_map<std::string, int>& nameToIdTable) {
     int nFields = (int)fields.size();
     
     for (int i = 1; i < parsedJSON.size(); i++) {
-    //for (int i = 1; i < 26; i++) {               стоппер для проверки промежуточных значений
+    //for (int i = 1; i < 25; i++) {               //стоппер для проверки промежуточных значений
     //    if (i == 25) {
     //        std::cout<<"i"<<std::endl;
     //    }
@@ -1085,12 +1093,21 @@ void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const
         //если есть обращение к полю работаем с NODE1 и определяем связи для неё, меняя вторую стрелку
         
         std::string name = parsedJSON[i]["name"];
-        if (parsedJSON[i].contains("f")) {                          //если есть обращение к полю, ищем индекс NODE1
+        if (parsedJSON[i].contains("f")) {                    //если есть обращение к полю, ищем индекс NODE1
             if (nFields == 2 && parsedJSON[i]["f"] == fields[1]){
                 type = 2;
             }
             varInd.second = CNFcontainer[varInd.first].findFieldInd(varInd.second);
             name = CNFcontainer[varInd.first].get_varName(varInd.second);
+        }
+        
+        //добавляем в таблицу соответствий имя переменной и номер строки кода
+        nameToIdTable[name] = parsedJSON[i]["id"];
+        if (varInd.first != -1) {
+            int next = CNFcontainer[varInd.first].getUnsafeLink(varInd.second, type);  //найдем на какой узел ссылается переменная, с которой мы работаем, потому что у нас есть возможность потерять этот узел
+            if (next != -1) {
+                nameToIdTable[CNFcontainer[varInd.first].get_varName(next)] = parsedJSON[i]["id"]; //перезапишем номер строки для узла
+            }
         }
         
         std::string value;
@@ -1144,6 +1161,7 @@ void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const
                 CNF nCnf = CNFcontainer[varInd.first].divide(nFields);               //разделяем, там же переопределяются фиктивне связи
                 if (nCnf.get_nVar() > 0) CNFcontainer.push_back(nCnf);
             }
+            nameToIdTable[value] = parsedJSON[i]["id"]; //Добавим новый узел в таблицу соответствий
         } else {
             std::pair<int, int> varInd2; //не может быть {-1, -1}, иначе исходный код не скомпилируется
             int type2 = 1;   //тип обращения к объекту для правой части
@@ -1161,6 +1179,13 @@ void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const
             } else {
                 varInd2 = find(CNFcontainer, parsedJSON[i]["value"]);
                 name2 = CNFcontainer[varInd2.first].get_varName(varInd2.second);
+            }
+            
+            //добавляем в таблицу соответствий имя переменной и номер строки кода
+            nameToIdTable[name2] = parsedJSON[i]["id"];
+            int next = CNFcontainer[varInd2.first].getUnsafeLink(varInd2.second, type2);  //найдем на какой узел ссылается переменная, с которой мы работаем, потому что у нас есть возможность потерять этот узел
+            if (next != -1) {
+                nameToIdTable[CNFcontainer[varInd2.first].get_varName(next)] = parsedJSON[i]["id"]; //перезапишем номер строки для узла
             }
                         
             if (!parsedJSON[i].contains("f")) {       //если var = ..
@@ -1393,9 +1418,10 @@ int main() {
         fields.push_back(parsedJSON[0]["fields"][0]);
         fields.push_back(parsedJSON[0]["fields"][1]);
     }
-    
-    //строим таблицу
-    makeBoolLinks(parsedJSON, CNFcontainer, fields);
+    //таблица соответствия
+    std::unordered_map<std::string, int> nameToIdTable;
+    //строим булеву таблицу
+    makeBoolLinks(parsedJSON, CNFcontainer, fields, nameToIdTable);
     
     std::cout << "\nРЕЗУЛЬТАТЫ 2-SAT ПРОВЕРКИ: " << std::endl;
     for (int i = 0; i < CNFcontainer.size(); i++) {
