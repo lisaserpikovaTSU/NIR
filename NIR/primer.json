@@ -1,7 +1,7 @@
 [
   {
-    "fields_num": 1,
-    "field": "next"
+    "fields_num": 2,
+    "fields": ["next", "prev"]
   },
   {
     "id": 14,
@@ -14,48 +14,57 @@
     "value": "N1"
   },
   {
-    "id": 17,
-    "name": "head",
-    "value": "newNode"
-  },
-  {
     "id": 18,
-    "name": "newNode",
-    "value": "N2"
-  },
-  {
-    "id": 20,
-    "name": "head",
-    "f": "next",
-    "value": "newNode"
-  },
-  {
-    "id": 23,
-    "name": "newNode",
-    "f": "next",
-    "value": "N3"
-  },
-  {
-    "id": 25,
-    "name": "newNode",
-    "value": {
-      "name": "newNode",
-      "f": "next"
-    }
-  },
-  {
-    "id": 26,
     "name": "newNode",
     "f": "next",
     "value": "NULL"
   },
   {
-    "id": 27,
+    "id": 19,
     "name": "newNode",
-    "value": "N4"
+    "f": "prev",
+    "value": "NULL"
+  },
+  {
+    "id": 20,
+    "name": "head",
+    "value": "newNode"
+  },
+  {
+    "id": 23,
+    "name": "newNode",
+    "value": "N2"
+  },
+  {
+    "id": 25,
+    "name": "newNode",
+    "f": "next",
+    "value": "head"
+  },
+  {
+    "id": 26,
+    "name": "newNode",
+    "f": "prev",
+    "value": "NULL"
+  },
+  {
+    "id": 27,
+    "name": "head",
+    "f": "prev",
+    "value": "newNode"
   },
   {
     "id": 28,
+    "name": "head",
+    "value": "newNode"
+  },
+  {
+    "id": 31,
+    "name": "newNode",
+    "value": "N3"
+  },
+  {
+    "id": 33,
     "name": "newNode",
     "f": "next",
     "value": {
@@ -64,8 +73,209 @@
     }
   },
   {
-    "id": 29,
+    "id": 34,
     "name": "newNode",
+    "f": "prev",
+    "value": "head"
+  },
+  {
+    "id": 35,
+    "name": "current",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 36,
+    "name": "current",
+    "f": "prev",
+    "value": "newNode"
+  },
+  {
+    "id": 37,
+    "name": "head",
+    "f": "next",
+    "value": "newNode"
+  },
+  {
+    "id": 40,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 41,
+    "name": "head",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 42,
+    "name": "head",
+    "f": "prev",
     "value": "NULL"
+  },
+  {
+    "id": 43,
+    "name": "current",
+    "op": "free"
+  },
+  {
+    "id": 46,
+    "name": "newNode",
+    "value": "N4"
+  },
+  {
+    "id": 48,
+    "name": "newNode",
+    "f": "next",
+    "value": "NULL"
+  },
+  {
+    "id": 50,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 51,
+    "name": "current",
+    "value": {
+      "name": "current",
+      "f": "next"
+    }
+  },
+  {
+    "id": 53,
+    "name": "current",
+    "f": "next",
+    "value": "newNode"
+  },
+  {
+    "id": 57,
+    "name": "first",
+    "value": "head"
+  },
+  {
+    "id": 58,
+    "name": "second",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 59,
+    "name": "first",
+    "f": "next",
+    "value": {
+      "name": "second",
+      "f": "next"
+    }
+  },
+  {
+    "id": 60,
+    "name": "second",
+    "f": "next",
+    "value": "first"
+  },
+  {
+    "id": 61,
+    "name": "second",
+    "f": "prev",
+    "value": "NULL"
+  },
+  {
+    "id": 62,
+    "name": "first",
+    "f": "prev",
+    "value": "second"
+  },
+  {
+    "id": 63,
+    "name": "current",
+    "value": {
+      "name": "first",
+      "f": "next"
+    }
+  },
+  {
+    "id": 64,
+    "name": "current",
+    "f": "prev",
+    "value": "first"
+  },
+  {
+    "id": 65,
+    "name": "head",
+    "value": "second"
+  },
+  {
+    "id": 69,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 71,
+    "name": "current",
+    "value": {
+      "name": "current",
+      "f": "next"
+    }
+  },
+  {
+    "id": 73,
+    "name": "current",
+    "value": {
+      "name": "current",
+      "f": "next"
+    }
+  },
+  {
+    "id": 78,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 79,
+    "name": "head",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 80,
+    "name": "current",
+    "op": "free"
+  },
+  {
+    "id": 82,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 83,
+    "name": "head",
+    "value": {
+      "name": "head",
+      "f": "next"
+    }
+  },
+  {
+    "id": 84,
+    "name": "current",
+    "op": "free"
+  },
+  {
+    "id": 86,
+    "name": "current",
+    "value": "head"
+  },
+  {
+    "id": 87,
+    "name": "current",
+    "op": "free"
   }
 ]

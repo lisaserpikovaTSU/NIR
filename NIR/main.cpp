@@ -11,122 +11,171 @@
 
 using json = nlohmann::json;
 
-//sat-решатель взят здесь
-//https ://github.com/QabasAK/2SAT-Solver/blob/main/2SAT/2SATSolver.cpp
-// defining CNFs
 using Clause = std::pair<int, int>;
 using Formula = std::vector<Clause>;
-
-class TwoSAT {
+// DPLL SAT Solver для произвольных формул
+class DPLLSolver {
 private:
-    // implication graph with vertices = 2 * variables
-    std::unordered_map<int, std::vector<int>> graph;
-    int vars = 0;
-
-    // necessary data structures for SCC & DFS
-    int id = 0;
-    std::unordered_map<int, int> ids;
-    std::unordered_map<int, int> low;
-    std::unordered_map<int, bool> inStack;
-    std::stack<int> s;
-
-    // hypothesis -> conclusion
-    // a or b = -a -> b
-    //        = -b -> a
-    void buildImplicationGraph(const Formula& formula) {
-        // max literal
-        for (const auto& clause : formula) {
-            vars = std::max(vars, std::abs(clause.first));
-            vars = std::max(vars, std::abs(clause.second));
-        }
-
-        // creating vertices
-        for (int i = 1; i <= vars; i++) {
-            graph[i] = std::vector<int>();
-            graph[-i] = std::vector<int>();
-        }
-
-        // creating edges
-        for (const auto& clause : formula) {
-            int a = clause.first;
-            int b = clause.second;
-            graph[-a].push_back(b);
-            graph[-b].push_back(a);
-        }
-    }
-
-    // to find strongly connected components with Tarjan's Algorithm
-    void DFS(int source) {
-        s.push(source);
-        inStack[source] = true;
-        ids[source] = id;
-        low[source] = id;
-        id++;
-        
-        if (graph.find(source) != graph.end()) {
-            for (int v : graph[source]) {
-                // if unvisited, DFS
-                if (ids.find(v) == ids.end() || ids[v] == -1) {
-                    DFS(v);
-                }
-                // smallest ID reachable from source to identify
-                // root node in SCC
-                if (inStack[v]) {
-                    low[source] = std::min(low[source], low[v]);
-                }
-            }
-        }
-        
-        // remove from the stack to avoid revisiting
-        if (ids[source] == low[source]) {
-            while (!s.empty()) {
-                int node = s.top();
-                s.pop();
-                inStack[node] = false;
-                low[node] = ids[source];
-                if (node == source) {
-                    break;
-                }
-            }
-        }
-    }
-
-    // O(V + E)
-    void findSCC() {
-        for (int i = 1; i <= vars; i++) {
-            ids[i] = -1;
-            ids[-i] = -1;
-            inStack[i] = false;
-            inStack[-i] = false;
-        }
-
-        for (int i = 1; i <= vars; i++) {
-            if (ids[i] == -1) DFS(i);
-            if (ids[-i] == -1) DFS(-i);
-        }
-    }
+    std::vector<std::vector<int>> clauses;
+    std::unordered_map<int, bool> assignment;
+    std::vector<int> variables;
 
 public:
-    bool solve(const Formula& formula) {
-        // Reset state for new formula
-        graph.clear();
-        ids.clear();
-        low.clear();
-        inStack.clear();
-        while (!s.empty()) s.pop();
-        id = 0;
-        vars = 0;
-
-        buildImplicationGraph(formula);
-        findSCC();
-        
-        // if a variable and its negation are in the same SCC : UNSAT
-        for (int i = 1; i <= vars; i++) {
-            if (low[i] == low[-i]) {
-                return false;
+    DPLLSolver() {}
+    
+    // Добавить клаузу
+    void addClause(const std::vector<int>& clause) {
+        clauses.push_back(clause);
+        // Добавляем переменные в список
+        for (int lit : clause) {
+            int var = std::abs(lit);
+            if (std::find(variables.begin(), variables.end(), var) == variables.end()) {
+                variables.push_back(var);
             }
         }
-        return true;
+    }
+    
+    // Очистить все клаузы
+    void clear() {
+        clauses.clear();
+        assignment.clear();
+        variables.clear();
+    }
+    
+    // Решить задачу
+    bool solve() {
+        assignment.clear();
+        return dpll(clauses, assignment);
+    }
+    
+    // Получить значение переменной в решении
+    std::optional<bool> getValue(int variable) const {
+        auto it = assignment.find(variable);
+        if (it != assignment.end()) {
+            return it->second;
+        }
+        return std::nullopt;
+    }
+    
+    // Получить все присваивания
+    const std::unordered_map<int, bool>& getAssignment() const {
+        return assignment;
+    }
+    
+    // Получить список всех переменных
+    const std::vector<int>& getVariables() const {
+        return variables;
+    }
+
+private:
+    bool dpll(std::vector<std::vector<int>> currentClauses,
+              std::unordered_map<int, bool> currentAssignment) {
+        
+        // Упрощение: распространение unit clauses
+        bool changed;
+        do {
+            changed = false;
+            std::vector<std::vector<int>> newClauses;
+            
+            for (const auto& clause : currentClauses) {
+                if (clause.size() == 1) {
+                    // Unit clause
+                    int lit = clause[0];
+                    int var = std::abs(lit);
+                    bool value = (lit > 0);
+                    
+                    if (currentAssignment.find(var) == currentAssignment.end()) {
+                        currentAssignment[var] = value;
+                        changed = true;
+                    } else if (currentAssignment[var] != value) {
+                        // Противоречие
+                        return false;
+                    }
+                }
+            }
+            
+            // Удалить удовлетворенные клаузы и противоречивые литералы
+            for (const auto& clause : currentClauses) {
+                std::vector<int> newClause;
+                bool clauseSatisfied = false;
+                
+                for (int lit : clause) {
+                    int var = std::abs(lit);
+                    auto it = currentAssignment.find(var);
+                    
+                    if (it != currentAssignment.end()) {
+                        bool varValue = it->second;
+                        bool litValue = (lit > 0);
+                        
+                        if (varValue == litValue) {
+                            clauseSatisfied = true;
+                            break;
+                        }
+                        // Пропустить противоречивый литерал
+                    } else {
+                        newClause.push_back(lit);
+                    }
+                }
+                
+                if (!clauseSatisfied) {
+                    if (newClause.empty()) {
+                        // Пустая клауза - противоречие
+                        return false;
+                    }
+                    newClauses.push_back(newClause);
+                }
+            }
+            
+            currentClauses = newClauses;
+            
+        } while (changed && !currentClauses.empty());
+        
+        // Проверка на выполнимость
+        if (currentClauses.empty()) {
+            assignment = currentAssignment;
+            return true;
+        }
+        
+        // Выбор переменной для ветвления (простая эвристика)
+        int var = chooseVariable(currentClauses);
+        if (var == -1) return false;
+        
+        // Попробовать присвоить true
+        auto newClausesTrue = currentClauses;
+        newClausesTrue.push_back({var});
+        auto newAssignmentTrue = currentAssignment;
+        
+        if (dpll(newClausesTrue, newAssignmentTrue)) {
+            return true;
+        }
+        
+        // Попробовать присвоить false
+        auto newClausesFalse = currentClauses;
+        newClausesFalse.push_back({-var});
+        auto newAssignmentFalse = currentAssignment;
+        
+        return dpll(newClausesFalse, newAssignmentFalse);
+    }
+    
+    int chooseVariable(const std::vector<std::vector<int>>& clauses) {
+        if (clauses.empty()) return -1;
+        
+        // Простая эвристика: выбрать первую переменную из первой не-unit клаузы
+        for (const auto& clause : clauses) {
+            if (clause.size() > 1) {
+                for (int lit : clause) {
+                    int var = std::abs(lit);
+                    return var;
+                }
+            }
+        }
+        
+        // Если все клаузы unit, выбрать первую переменную
+        if (!clauses.empty() && !clauses[0].empty()) {
+            return std::abs(clauses[0][0]);
+        }
+        
+        return -1;
     }
 };
 
@@ -421,15 +470,13 @@ public:
     void makeDangling(int&, int);              //удаление исходящей ссылки
     void merge(CNF&, int&, int&, int);         //слияние двух кнф
     
-    //методы для построения 2-кнф
-    Formula build2CNF();
-    void print2CNF(const Formula& formula);
-    std::string get2CNFString(const Formula& formula);
-    void print2CNFNumeric(const Formula& formula);
+    std::vector<std::vector<int>> buildCNF();
+    bool isSatisfiableDPLL();
+    void printCNFFormula();
+    void printDPLLResult(const std::unordered_map<std::string, int>& nameToIdTable);
+    void printDPLLResult();
     
-    //методы для работы с sat-решателем
-    bool isSatisfiable();
-    void printSATResult();
+    void analyzeVariableTable(const std::unordered_map<std::string, int>& nameToIdTable);
 };
 
 CNF::CNF() {
@@ -1078,8 +1125,8 @@ std::pair<int, int> find(std::vector<CNF>& CNFcontainer, std::string name){
 void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::vector<std::string>& fields, std::unordered_map<std::string, int>& nameToIdTable) {
     int nFields = (int)fields.size();
     
-    for (int i = 1; i < parsedJSON.size(); i++) {
-    //for (int i = 1; i < 25; i++) {               //стоппер для проверки промежуточных значений
+    //for (int i = 1; i < parsedJSON.size(); i++) {
+    for (int i = 1; i < 25; i++) {               //стоппер для проверки промежуточных значений
     //    if (i == 25) {
     //        std::cout<<"i"<<std::endl;
     //    }
@@ -1266,136 +1313,226 @@ void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const
     }
 }
 
-// Реализация методов для построения 2-КНФ
-Formula CNF::build2CNF() {
-    Formula formula;
-    std::vector<bool> used_variables(nVar + 1, false);
-
-    // Основной алгоритм построения 2-КНФ
+std::vector<std::vector<int>> CNF::buildCNF() {
+    std::vector<std::vector<int>> cnf;
+    std::unordered_set<int> used_variables;
+        
+    // Основной алгоритм построения КНФ из графа связей
     for (int i = 0; i <= nVar; i++) {
         for (int j = 0; j <= nVar; j++) {
             if (neg[j][i] == 1) {
-                // Сдвигаем индексы: 0 -> 1, 1 -> 2, и т.д. чтобы учесть null (не можем добавить -0)
-                formula.push_back({-(i + 1), j + 1});
-                used_variables[i] = true;
-                used_variables[j] = true;
+                // Каждое отношение neg[j][i] дает клаузу: -i ∨ j
+                std::vector<int> clause;
+                clause.push_back(-(i + 1)); // +1 чтобы избежать 0
+                clause.push_back(j + 1);
+                cnf.push_back(clause);
+                    
+                used_variables.insert(i + 1);
+                used_variables.insert(j + 1);
             }
         }
     }
-
-    // Добавляем черно-белое решение
-    if (nVar > 0) {
-        // Белое решение: (1 ∨ 2 ∨ 3 ∨ ... ∨ nVar+1)
-        // В 2-КНФ представляем как: (1 ∨ 2) ∧ (2 ∨ 3) ∧ ... ∧ (nVar ∨ nVar+1)
-        for (int i = 1; i <= nVar; i++) {
-            formula.push_back({i, i + 1});
-        }
-        
-        // Черное решение: (-1 ∨ -2 ∨ -3 ∨ ... ∨ -(nVar+1))
-        // В 2-КНФ представляем как: (-1 ∨ -2) ∧ (-2 ∨ -3) ∧ ... ∧ (-(nVar) ∨ -nVar+1)
-        for (int i = 1; i <= nVar; i++) {
-            formula.push_back({-i, -(i + 1)});
-        }
-    }
-
-    return formula;
-}
-
-void CNF::print2CNF(const Formula& formula) {
-    std::cout << "2-CNF формула:" << std::endl;
-    for (int k = 0; k < formula.size(); k++) {
-        const std::pair<int, int>& clause = formula[k];
-        int var1 = clause.first;
-        int var2 = clause.second;
-        
-        std::cout << "(";
-        if (var1 > 0) {
-            std::cout << var_names[var1];
-        } else {
-            std::cout << "¬" << var_names[-var1];
-        }
-        
-        std::cout << " ∨ ";
-        
-        if (var2 > 0) {
-            std::cout << var_names[var2];
-        } else {
-            std::cout << "¬" << var_names[-var2];
-        }
-        std::cout << ")" << std::endl;
-    }
-}
-
-std::string CNF::get2CNFString(const Formula& formula) {
-    std::string result;
-    for (int i = 0; i < formula.size(); i++) {
-        const std::pair<int, int>& clause = formula[i];
-        int var1 = clause.first;
-        int var2 = clause.second;
-        
-        result += "(";
-        if (var1 > 0) {
-            result += var_names[var1];
-        } else {
-            result += "¬" + var_names[-var1];
-        }
-        
-        result += " ∨ ";
-        
-        if (var2 > 0) {
-            result += var_names[var2];
-        } else {
-            result += "¬" + var_names[-var2];
-        }
-        result += ")";
-        
-        if (i < formula.size() - 1) {
-            result += " ∧ ";
-        }
-    }
-    return result;
-}
-
-void CNF::print2CNFNumeric(const Formula& formula) {
-    std::cout << "2-CNF формула (числовое представление):" << std::endl;
-    for (int i = 0; i < formula.size(); i++) {
-        const std::pair<int, int>& clause = formula[i];
-        std::cout << "(" << clause.first << " ∨ " << clause.second << ")" << std::endl;
-    }
-}
-
-bool CNF::isSatisfiable() {
-    Formula formula = build2CNF();
     
-    if (formula.empty()) {
+    // Добавляем черно-белые дизъюнкты
+        
+    // Белый дизъюнкт: содержит все переменные (x1 ∨ x2 ∨ x3 ∨ ...)
+    if (nVar > 0) {
+        std::vector<int> white_clause;
+        for (int i = 1; i <= nVar + 1; i++) { // +1 потому что мы сдвинули индексы
+            white_clause.push_back(i);
+        }
+        cnf.push_back(white_clause);
+    }
+        
+    // Черный дизъюнкт: содержит все переменные с отрицанием (¬x1 ∨ ¬x2 ∨ ¬x3 ∨ ...)
+    if (nVar > 0) {
+        std::vector<int> black_clause;
+        for (int i = 1; i <= nVar + 1; i++) { // +1 потому что мы сдвинули индексы
+            black_clause.push_back(-i);
+        }
+        cnf.push_back(black_clause);
+    }
+    
+    return cnf;
+}
+
+bool CNF::isSatisfiableDPLL() {
+    std::vector<std::vector<int>> cnf = buildCNF();
+        
+    if (cnf.empty()) {
         return true;
     }
-    
-    TwoSAT solver;
-    return solver.solve(formula);
+        
+    DPLLSolver solver;
+    for (const auto& clause : cnf) {
+        solver.addClause(clause);
+    }
+        
+    return solver.solve();
 }
 
-void CNF::printSATResult() {
-    Formula formula = build2CNF();
-    
-    std::cout << "2-CNF формула:" << std::endl;
-    for (size_t i = 0; i < formula.size(); i++) {
-        const Clause& clause = formula[i];
-        std::cout << "(" << clause.first << " ∨ " << clause.second << ")";
-        if (i < formula.size() - 1) {
+void CNF::printCNFFormula() {
+    std::vector<std::vector<int>> cnf = buildCNF();
+        
+    std::cout << "CNF формула:" << std::endl;
+    for (size_t i = 0; i < cnf.size(); i++) {
+        const auto& clause = cnf[i];
+        std::cout << "(";
+        for (size_t j = 0; j < clause.size(); j++) {
+            int lit = clause[j];
+            if (lit > 0) {
+                std::cout << "x" << lit;
+            } else {
+                std::cout << "¬x" << -lit;
+            }
+            if (j < clause.size() - 1) {
+                std::cout << " ∨ ";
+            }
+        }
+        std::cout << ")";
+        if (i < cnf.size() - 1) {
             std::cout << " ∧ ";
         }
+        std::cout << std::endl;
+    }
+}
+
+void CNF::printDPLLResult(const std::unordered_map<std::string, int>& nameToIdTable) {
+    std::vector<std::vector<int>> cnf = buildCNF();
+    
+    std::cout << "CNF формула: " << std::endl;
+    for (size_t i = 0; i < cnf.size(); i++) {
+        const auto& clause = cnf[i];
+        std::cout << "(";
+        for (size_t j = 0; j < clause.size(); j++) {
+            std::cout << clause[j];
+            if (j < clause.size() - 1) std::cout << " ∨ ";
+        }
+        std::cout << ")";
+        if (i < cnf.size() - 1) std::cout << " ∧ ";
     }
     std::cout << std::endl;
     
-    bool satisfiable = isSatisfiable();
-    std::cout << "2-SAT результат: ";
+    bool satisfiable = isSatisfiableDPLL();
+    std::cout << "DPLL SAT результат: ";
     if (satisfiable) {
         std::cout << "SATISFIABLE" << std::endl;
+        // Вызываем отдельную функцию анализа
+        analyzeVariableTable(nameToIdTable);
     } else {
         std::cout << "UNSATISFIABLE" << std::endl;
     }
+    std::cout << std::endl;
 }
+
+void CNF::analyzeVariableTable(const std::unordered_map<std::string, int>& nameToIdTable) {
+    std::vector<std::vector<int>> cnf = buildCNF();
+    
+    // Собираем статистику по переменным
+    std::unordered_map<int, int> var_positive_count;
+    std::unordered_map<int, int> var_negative_count;
+    std::unordered_set<int> all_variables;
+    
+    // Исключаем черно-белые дизъюнкты из анализа
+    std::vector<std::vector<int>> non_bw_cnf;
+    for (const auto& clause : cnf) {
+        bool is_white_clause = true;
+        bool is_black_clause = true;
+        
+        if (clause.size() == nVar + 1) {
+            for (int lit : clause) {
+                if (lit <= 0) {
+                    is_white_clause = false;
+                    break;
+                }
+            }
+        } else {
+            is_white_clause = false;
+        }
+        
+        if (clause.size() == nVar + 1) {
+            for (int lit : clause) {
+                if (lit >= 0) {
+                    is_black_clause = false;
+                    break;
+                }
+            }
+        } else {
+            is_black_clause = false;
+        }
+        
+        if (!is_white_clause && !is_black_clause) {
+            non_bw_cnf.push_back(clause);
+            
+            for (int lit : clause) {
+                int var = std::abs(lit);
+                all_variables.insert(var);
+                
+                if (lit > 0) {
+                    var_positive_count[var]++;
+                } else {
+                    var_negative_count[var]++;
+                }
+            }
+        }
+    }
+    
+    // Анализируем каждую переменную
+    std::vector<int> problematic_vars;
+    std::vector<int> only_positive_vars;
+    std::vector<int> only_negative_vars;
+    
+    for (int var : all_variables) {
+        int pos_count = var_positive_count[var];
+        int neg_count = var_negative_count[var];
+        
+        if (pos_count == 0 && neg_count == 0) {
+            problematic_vars.push_back(var);
+        }
+        else if (pos_count == 0 && neg_count > 0) {
+            problematic_vars.push_back(var);
+            only_negative_vars.push_back(var);
+        }
+        else if (pos_count > 0 && neg_count == 0) {
+            only_positive_vars.push_back(var);
+        }
+    }
+    
+    // Выводим общую статистику
+    std::cout << "--- Анализ таблицы переменных ---" << std::endl;
+    // Детальный анализ проблемных переменных
+    if (!problematic_vars.empty()) {
+        std::cout << "--- Проблемные переменные ---" << std::endl;
+        std::cout << "  Индексы: ";
+        for (size_t i = 0; i < problematic_vars.size(); i++) {
+            std::cout << problematic_vars[i];
+            if (i < problematic_vars.size() - 1) std::cout << ", ";
+        }
+        std::cout << std::endl;
+        
+        std::cout << "  Соответствие именам и строкам кода:" << std::endl;
+        for (int var : problematic_vars) {
+            int original_index = var - 1;
+            if (original_index >= 0 && original_index < var_names.size()) {
+                std::string var_name = var_names[original_index];
+                std::cout << "    - " << var_name;
+                
+                // Ищем в таблице соответствий
+                auto it = nameToIdTable.find(var_name);
+                if (it != nameToIdTable.end()) {
+                    std::cout << " -> строка " << it->second;
+                    
+                } else {
+                    std::cout << " -> строка не найдена в таблице";
+                }
+                std::cout << std::endl;
+            } else {
+                std::cout << "    - x" << var << " -> имя не найдено в var_names" << std::endl;
+            }
+        }
+    }
+}
+
 
 int main() {
     std::ifstream data("/Users/liza/School/NIR/NIR/primer.json");
@@ -1423,15 +1560,14 @@ int main() {
     //строим булеву таблицу
     makeBoolLinks(parsedJSON, CNFcontainer, fields, nameToIdTable);
     
-    std::cout << "\nРЕЗУЛЬТАТЫ 2-SAT ПРОВЕРКИ: " << std::endl;
-    for (int i = 0; i < CNFcontainer.size(); i++) {
-        std::cout << "\n=== CNF " << i + 1 << " ===" << std::endl;
-        CNFcontainer[i].printCNF();
-            
-        std::cout << "--- 2-SAT Анализ ---" << std::endl;
-        CNFcontainer[i].printSATResult();
-        std::cout << std::endl << std::endl;
-    }
+    std::cout << "\n=== РЕЗУЛЬТАТЫ SAT ПРОВЕРКИ ===" << std::endl;
+        for (int i = 0; i < CNFcontainer.size(); i++) {
+            std::cout << "\n=== CNF " << i + 1 << " ===" << std::endl;
+            CNFcontainer[i].printCNF();
+                
+            std::cout << "--- SAT Анализ ---" << std::endl;
+            CNFcontainer[i].printDPLLResult(nameToIdTable);
+        }
 
                             
     data.close();
