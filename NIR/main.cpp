@@ -1125,8 +1125,8 @@ std::pair<int, int> find(std::vector<CNF>& CNFcontainer, std::string name){
 void makeBoolLinks(const json& parsedJSON, std::vector<CNF>& CNFcontainer, const std::vector<std::string>& fields, std::unordered_map<std::string, int>& nameToIdTable) {
     int nFields = (int)fields.size();
     
-    //for (int i = 1; i < parsedJSON.size(); i++) {
-    for (int i = 1; i < 25; i++) {               //стоппер для проверки промежуточных значений
+    for (int i = 1; i < parsedJSON.size(); i++) {
+    //for (int i = 1; i < 25; i++) {               //стоппер для проверки промежуточных значений
     //    if (i == 25) {
     //        std::cout<<"i"<<std::endl;
     //    }
@@ -1428,108 +1428,113 @@ void CNF::printDPLLResult(const std::unordered_map<std::string, int>& nameToIdTa
 void CNF::analyzeVariableTable(const std::unordered_map<std::string, int>& nameToIdTable) {
     std::vector<std::vector<int>> cnf = buildCNF();
     
-    // Собираем статистику по переменным
-    std::unordered_map<int, int> var_positive_count;
-    std::unordered_map<int, int> var_negative_count;
-    std::unordered_set<int> all_variables;
+    // Собираем статистику по переменным из ВСЕХ клауз CNF
+    std::unordered_map<int, int> var_positive_regular;  // только обычные дизъюнкты
+    std::unordered_map<int, int> var_negative_regular;  // только обычные дизъюнкты
+    std::unordered_map<int, int> var_positive_all;      // все дизъюнкты
+    std::unordered_map<int, int> var_negative_all;      // все дизъюнкты
+    std::unordered_set<int> all_variables_in_cnf;
     
-    // Исключаем черно-белые дизъюнкты из анализа
-    std::vector<std::vector<int>> non_bw_cnf;
+    // Проходим по всем клаузам в CNF
     for (const auto& clause : cnf) {
-        bool is_white_clause = true;
-        bool is_black_clause = true;
+        // Определяем, является ли клауза черно-белой
+        bool is_white_clause = (clause.size() >= nVar); // более мягкое условие
+        bool is_black_clause = (clause.size() >= nVar);
         
-        if (clause.size() == nVar + 1) {
+        if (is_white_clause) {
             for (int lit : clause) {
                 if (lit <= 0) {
                     is_white_clause = false;
                     break;
                 }
             }
-        } else {
-            is_white_clause = false;
         }
         
-        if (clause.size() == nVar + 1) {
+        if (is_black_clause) {
             for (int lit : clause) {
                 if (lit >= 0) {
                     is_black_clause = false;
                     break;
                 }
             }
-        } else {
-            is_black_clause = false;
         }
         
-        if (!is_white_clause && !is_black_clause) {
-            non_bw_cnf.push_back(clause);
+        bool is_bw_clause = is_white_clause || is_black_clause;
+        
+        // Считаем вхождения для всех переменных
+        for (int lit : clause) {
+            int var = std::abs(lit);
+            all_variables_in_cnf.insert(var);
             
-            for (int lit : clause) {
-                int var = std::abs(lit);
-                all_variables.insert(var);
-                
+            // Все дизъюнкты
+            if (lit > 0) {
+                var_positive_all[var]++;
+            } else {
+                var_negative_all[var]++;
+            }
+            
+            // Только обычные дизъюнкты
+            if (!is_bw_clause) {
                 if (lit > 0) {
-                    var_positive_count[var]++;
+                    var_positive_regular[var]++;
                 } else {
-                    var_negative_count[var]++;
+                    var_negative_regular[var]++;
                 }
             }
         }
     }
     
-    // Анализируем каждую переменную
+    // Анализируем каждую переменную из CNF (исключая nullptr)
     std::vector<int> problematic_vars;
-    std::vector<int> only_positive_vars;
-    std::vector<int> only_negative_vars;
     
-    for (int var : all_variables) {
-        int pos_count = var_positive_count[var];
-        int neg_count = var_negative_count[var];
+    std::string problem_type;
+    for (int var : all_variables_in_cnf) {
+        // Пропускаем nullptr (переменная с индексом 1)
+        if (var == 1) continue;
         
-        if (pos_count == 0 && neg_count == 0) {
+        int pos_regular = var_positive_regular[var];
+        int neg_regular = var_negative_regular[var];
+        int total_regular = pos_regular + neg_regular;
+        
+        int pos_all = var_positive_all[var];
+        int neg_all = var_negative_all[var];
+        
+        // Критерии проблемных переменных:
+        bool is_problematic = false;
+        
+        if (total_regular == 0) {
+            is_problematic = true;
+            problem_type = "Потерянный узел/ висячая переменная";
+        } else if (pos_regular == 0 && neg_regular > 0) {
+            is_problematic = true;
+            problem_type = "Не имеет указателя(потерянный узел)/ не все указатели инициализированны";
+        }
+        
+        if (is_problematic) {
             problematic_vars.push_back(var);
         }
-        else if (pos_count == 0 && neg_count > 0) {
-            problematic_vars.push_back(var);
-            only_negative_vars.push_back(var);
-        }
-        else if (pos_count > 0 && neg_count == 0) {
-            only_positive_vars.push_back(var);
-        }
+        
     }
     
-    // Выводим общую статистику
-    std::cout << "--- Анализ таблицы переменных ---" << std::endl;
-    // Детальный анализ проблемных переменных
+    // Выводим только проблемные переменные
     if (!problematic_vars.empty()) {
-        std::cout << "--- Проблемные переменные ---" << std::endl;
-        std::cout << "  Индексы: ";
-        for (size_t i = 0; i < problematic_vars.size(); i++) {
-            std::cout << problematic_vars[i];
-            if (i < problematic_vars.size() - 1) std::cout << ", ";
-        }
-        std::cout << std::endl;
-        
-        std::cout << "  Соответствие именам и строкам кода:" << std::endl;
+        std::cout << "--- ПРОБЛЕМНЫЕ ПЕРЕМЕННЫЕ ---" << std::endl;
         for (int var : problematic_vars) {
             int original_index = var - 1;
-            if (original_index >= 0 && original_index < var_names.size()) {
-                std::string var_name = var_names[original_index];
-                std::cout << "    - " << var_name;
-                
-                // Ищем в таблице соответствий
-                auto it = nameToIdTable.find(var_name);
-                if (it != nameToIdTable.end()) {
-                    std::cout << " -> строка " << it->second;
-                    
-                } else {
-                    std::cout << " -> строка не найдена в таблице";
-                }
-                std::cout << std::endl;
-            } else {
-                std::cout << "    - x" << var << " -> имя не найдено в var_names" << std::endl;
+            std::string var_name = (original_index >= 0 && original_index < var_names.size())
+                                 ? var_names[original_index] : "unknown";
+            
+            std::cout << "  - " << var_name;
+            
+            auto it = nameToIdTable.find(var_name);
+            if (it != nameToIdTable.end()) {
+                std::cout << " -> строка " << it->second;
+                std::cout << " [" << problem_type << "]";
             }
+            std::cout << std::endl;
         }
+    } else {
+        std::cout << "--- ПРОБЛЕМНЫХ ПЕРЕМЕННЫХ НЕТ ---" << std::endl;
     }
 }
 
